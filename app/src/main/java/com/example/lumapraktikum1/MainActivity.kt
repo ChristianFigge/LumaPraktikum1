@@ -50,7 +50,6 @@ class MainActivity : ComponentActivity() {
     private var str_gyrosData = mutableStateOf("\nNO DATA YET\n")
     private var str_lightData = mutableStateOf("\nNO DATA YET\n")
     private var str_magnetData = mutableStateOf("\nNO DATA YET\n")
-
     private lateinit var sensorManager: SensorManager
     private val SENSOR_TYPES = listOf(
         Sensor.TYPE_ACCELEROMETER,
@@ -63,24 +62,23 @@ class MainActivity : ComponentActivity() {
     private var sensorListeners = mutableMapOf<Int, LumaticSensorListener>()
     //private var sensorDataStrings = mutableMapOf<Int, MutableState<String>>()
     private var sensorRunnables = mutableMapOf<Int, Runnable>()
+    private var sensorLoopHandler = Handler(Looper.getMainLooper())
 
 
     private lateinit var locationManager: LocationManager
-    private val locationProviders =
-        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+    private val LOCATION_PROVIDERS = listOf(
+        LocationManager.GPS_PROVIDER,
+        LocationManager.NETWORK_PROVIDER
+    )
     private var locationListenersAndData =
         mutableMapOf<String, Pair<LocationListener, MutableState<String>>>()
 
-    private val locationPermissions = arrayOf(
+    private val LOCATION_PERMISSIONS = arrayOf(
         android.Manifest.permission.ACCESS_FINE_LOCATION,
         android.Manifest.permission.ACCESS_COARSE_LOCATION
     )
-
     private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
     private var locationPermissionsGranted: Boolean = true
-
-    // für delayed sensor loop:
-    private var handler = Handler(Looper.getMainLooper())
 
     @Composable
     private fun PrintSensorData(
@@ -171,7 +169,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Location Listeners & Data als dictionary mit ["provider"] = Pair<Listener, str_Data>
-        locationProviders.forEach {
+        LOCATION_PROVIDERS.forEach {
             val str_locData = mutableStateOf("NO DATA YET\n")
 
             locationListenersAndData[it] = Pair<LocationListener, MutableState<String>>(
@@ -191,11 +189,10 @@ class MainActivity : ComponentActivity() {
         sensorListeners[sensorType]?.runDelayedLoop = runDelayedLoop
 
         // falls nötig invalid user input abfangen & millisec -> mikrosec
-        val freqUs : Int
-        if(sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
-            freqUs = MIN_SENSOR_DELAY_MS * 1000
+        val freqUs = if (sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
+            MIN_SENSOR_DELAY_MS * 1000
         } else {
-            freqUs = sampleFrequencyMs * 1000
+            sampleFrequencyMs * 1000
         }
 
         sensorManager.registerListener(
@@ -218,18 +215,18 @@ class MainActivity : ComponentActivity() {
         sensorRunnables[sensorType] = object : Runnable {
             override fun run() {
                 registerSensorListener(sensorType, MIN_SENSOR_DELAY_MS, true)
-                handler.postDelayed(this, sampleFrequencyMs)
+                sensorLoopHandler.postDelayed(this, sampleFrequencyMs)
             }
         }
-        handler.post(sensorRunnables[sensorType] as Runnable)
+        sensorLoopHandler.post(sensorRunnables[sensorType] as Runnable)
     }
 
     private fun stopDelayedSensorLoop(sensorType : Int) {
-        sensorRunnables[sensorType]?.let { handler.removeCallbacks(it) }
+        sensorRunnables[sensorType]?.let { sensorLoopHandler.removeCallbacks(it) }
     }
 
     private fun hasAllLocationPermissions(): Boolean {
-        locationPermissions.forEach {
+        LOCATION_PERMISSIONS.forEach {
             if (ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_DENIED) {
                 return false
             }
@@ -238,24 +235,28 @@ class MainActivity : ComponentActivity() {
     }
 
     @SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
-    private fun registerLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
+    private fun registerLocationListener(provider : String, minTimeMs: Long, minDistanceM : Float = 0f) {
         if (locationPermissionsGranted) {
-            // registriere location listener für GPS & NETWORK:
-            locationListenersAndData.forEach { (provider, listenerAndData) ->
-                listenerAndData.second.value = "Waiting 4 signal ...\n"
-                locationManager.requestLocationUpdates(
-                    provider,
-                    minTimeMs,
-                    minDistanceM,
-                    listenerAndData.first
-                )
+            locationListenersAndData[provider]?.let {
+                it.second.value = "Waiting 4 signal ...\n"
+                locationManager.requestLocationUpdates(provider, minTimeMs, minDistanceM, it.first)
             }
         }
     }
 
-    private fun unregisterLocationListeners() {
-        locationListenersAndData.forEach { (_, listenerAndData) ->
-            locationManager.removeUpdates(listenerAndData.first)
+    private fun unregisterLocationListener(provider : String) {
+        locationListenersAndData[provider]?.let { locationManager.removeUpdates(it.first) }
+    }
+
+    private fun registerAllLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
+        LOCATION_PROVIDERS.forEach {
+            registerLocationListener(it, minTimeMs, minDistanceM)
+        }
+    }
+
+    private fun unregisterAllLocationListeners() {
+        LOCATION_PROVIDERS.forEach {
+            unregisterLocationListener(it)
         }
     }
 
@@ -291,13 +292,13 @@ class MainActivity : ComponentActivity() {
 
     private fun stopAllReadouts() {
         stopAllSensors()
-        unregisterLocationListeners()
+        unregisterAllLocationListeners()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Request Launcher definieren:
+        // PERMISSION Request Launcher definieren:
         locationPermissionRequest =
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
@@ -321,7 +322,7 @@ class MainActivity : ComponentActivity() {
         // s. https://developer.android.com/training/permissions/requesting#allow-system-manage-request-code
         if (!hasAllLocationPermissions()) {
             Log.i("LocPermissions", "Check: Location Permissions denied.")
-            locationPermissionRequest.launch(locationPermissions)
+            locationPermissionRequest.launch(LOCATION_PERMISSIONS)
         } else {
             Log.i("LocPermissions", "Check: Location Permissions granted.")
         }
@@ -370,7 +371,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     stopAllReadouts()
                                     startAllSensors(MIN_SENSOR_DELAY_MS)
-                                    registerLocationListeners(0L)
+                                    registerAllLocationListeners(0L)
                                 }
                             )
                             Button(
@@ -379,7 +380,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     stopAllReadouts()
                                     startAllSensors(1000)
-                                    registerLocationListeners(1000L)
+                                    registerAllLocationListeners(1000L)
                                 }
                             )
                         }
