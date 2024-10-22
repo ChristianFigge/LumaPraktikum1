@@ -11,6 +11,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -78,10 +79,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
     private var locationPermissionsGranted: Boolean = true
 
-    // delayed sensor loop:
-    private var handler = Handler() // deprecated TODO update
-    //private var runDelayedSensorLoop: Boolean = true
-    //private var runnable: Runnable? = null
+    // für delayed sensor loop:
+    private var handler = Handler(Looper.getMainLooper())
 
     @Composable
     private fun PrintSensorData(
@@ -188,14 +187,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun registerSensorListener(sensorType : Int, sampleFrequencyUs : Int, runDelayedLoop : Boolean) {
+    private fun registerSensorListener(sensorType : Int, sampleFrequencyMs : Int, runDelayedLoop : Boolean) {
         sensorListeners[sensorType]?.runDelayedLoop = runDelayedLoop
+
+        // falls nötig invalid user input abfangen & millisec -> mikrosec
+        val freqUs : Int
+        if(sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
+            freqUs = MIN_SENSOR_DELAY_MS * 1000
+        } else {
+            freqUs = sampleFrequencyMs * 1000
+        }
 
         sensorManager.registerListener(
             sensorListeners[sensorType],
             sensorManager.getDefaultSensor(sensorType),
-            sampleFrequencyUs,
-            sampleFrequencyUs
+            freqUs,
+            freqUs
         )
     }
 
@@ -210,7 +217,7 @@ class MainActivity : ComponentActivity() {
     private fun startDelayedSensorLoop(sensorType : Int, sampleFrequencyMs : Long) {
         sensorRunnables[sensorType] = object : Runnable {
             override fun run() {
-                registerSensorListener(sensorType, MIN_SENSOR_DELAY_MS * 1000, true)
+                registerSensorListener(sensorType, MIN_SENSOR_DELAY_MS, true)
                 handler.postDelayed(this, sampleFrequencyMs)
             }
         }
@@ -231,7 +238,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
-    private fun registerLocationListeners(minTimeMs: Long = 1000L) {
+    private fun registerLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
         if (locationPermissionsGranted) {
             // registriere location listener für GPS & NETWORK:
             locationListenersAndData.forEach { (provider, listenerAndData) ->
@@ -239,7 +246,7 @@ class MainActivity : ComponentActivity() {
                 locationManager.requestLocationUpdates(
                     provider,
                     minTimeMs,
-                    0f,
+                    minDistanceM,
                     listenerAndData.first
                 )
             }
@@ -256,7 +263,7 @@ class MainActivity : ComponentActivity() {
         // nutzt .registerListener(..., samplingPeriodUs) für schnelle Frequenzen
         // (ansonsten total unzuverlässig) und einen delayed Loop für langsamere
         if (sampleFrequencyMs < 200) {
-            registerSensorListener(sensorType, sampleFrequencyMs * 1000, false)
+            registerSensorListener(sensorType, sampleFrequencyMs, false)
         } else {
             startDelayedSensorLoop(sensorType, sampleFrequencyMs.toLong())
         }
