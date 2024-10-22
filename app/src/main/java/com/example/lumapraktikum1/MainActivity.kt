@@ -203,18 +203,6 @@ class MainActivity : ComponentActivity() {
         sensorManager.unregisterListener(sensorListeners[sensorType])
     }
 
-    private fun registerAllSensorListeners(sampleFrequencyUs: Int, runDelayedLoops : Boolean) {
-        SENSOR_TYPES.forEach {
-            registerSensorListener(it, sampleFrequencyUs, runDelayedLoops)
-        }
-    }
-
-    private fun unregisterAllSensorListeners() {
-        SENSOR_TYPES.forEach {
-            unregisterSensorListener(it)
-        }
-    }
-
     // Für langsame Samplerates:
     // .registerListener(.., samplingPeriodUs) wird für Werte >200ms scheinbar ignoriert
     // und ein postDelayed skript im Listener würde nur die Verarbeitung delayen, nicht das sampling.
@@ -231,18 +219,6 @@ class MainActivity : ComponentActivity() {
 
     private fun stopDelayedSensorLoop(sensorType : Int) {
         sensorRunnables[sensorType]?.let { handler.removeCallbacks(it) }
-    }
-
-    private fun startAllDelayedSensorLoops(sampleFrequencyMs: Long) {
-        SENSOR_TYPES.forEach {
-            startDelayedSensorLoop(it, sampleFrequencyMs)
-        }
-    }
-
-    private fun stopAllDelayedSensorLoops() {
-        SENSOR_TYPES.forEach {
-            stopDelayedSensorLoop(it)
-        }
     }
 
     private fun hasAllLocationPermissions(): Boolean {
@@ -276,20 +252,38 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-    private fun startAllSensors(sampleFrequencyMs: Int) {
+    private fun startSensor(sensorType : Int, sampleFrequencyMs : Int) {
         // nutzt .registerListener(..., samplingPeriodUs) für schnelle Frequenzen
         // (ansonsten total unzuverlässig) und einen delayed Loop für langsamere
         if (sampleFrequencyMs < 200) {
-            registerAllSensorListeners(sampleFrequencyMs * 1000, false)
+            registerSensorListener(sensorType, sampleFrequencyMs * 1000, false)
         } else {
-            startAllDelayedSensorLoops(sampleFrequencyMs.toLong())
+            startDelayedSensorLoop(sensorType, sampleFrequencyMs.toLong())
+        }
+    }
+
+    private fun stopSensor(sensorType : Int) {
+        if(sensorListeners[sensorType]?.runDelayedLoop == true) {
+            stopDelayedSensorLoop(sensorType)
+        } else {
+            unregisterSensorListener(sensorType)
+        }
+    }
+
+    private fun startAllSensors(sampleFrequencyMs: Int) {
+        SENSOR_TYPES.forEach {
+            startSensor(it, sampleFrequencyMs)
+        }
+    }
+
+    private fun stopAllSensors() {
+        SENSOR_TYPES.forEach {
+            stopSensor(it)
         }
     }
 
     private fun stopAllReadouts() {
-        stopAllDelayedSensorLoops()
-        unregisterAllSensorListeners()
+        stopAllSensors()
         unregisterLocationListeners()
     }
 
@@ -368,8 +362,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.padding(horizontal = 20.dp),
                                 onClick = {
                                     stopAllReadouts()
-                                    //runDelayedSensorLoop = false
-                                    startAllSensors(MIN_SENSOR_DELAY_MS) //registerAllSensorListeners()
+                                    startAllSensors(MIN_SENSOR_DELAY_MS)
                                     registerLocationListeners(0L)
                                 }
                             )
@@ -378,8 +371,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.padding(horizontal = 20.dp),
                                 onClick = {
                                     stopAllReadouts()
-                                    //runDelayedSensorLoop = true
-                                    startAllSensors(1000) //startDelayedSensorLoop(1000L)
+                                    startAllSensors(1000)
                                     registerLocationListeners(1000L)
                                 }
                             )
