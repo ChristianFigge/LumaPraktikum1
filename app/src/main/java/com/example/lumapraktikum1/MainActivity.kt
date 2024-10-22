@@ -45,40 +45,51 @@ import kotlin.math.sqrt
 
 
 class MainActivity : ComponentActivity() {
-    private val MIN_SENSOR_DELAY_MS : Int = 20
+    private val MIN_SENSOR_DELAY_MS: Int = 20
     private var str_accelData = mutableStateOf("\nNO DATA YET\n")
     private var str_gyrosData = mutableStateOf("\nNO DATA YET\n")
     private var str_lightData = mutableStateOf("\nNO DATA YET\n")
     private var str_magnetData = mutableStateOf("\nNO DATA YET\n")
 
+    private lateinit var sensorManager: SensorManager
     private val SENSOR_TYPES = listOf(
         Sensor.TYPE_ACCELEROMETER,
         Sensor.TYPE_GYROSCOPE,
         Sensor.TYPE_LIGHT,
         Sensor.TYPE_MAGNETIC_FIELD
     )
-    private lateinit var sensorManager : SensorManager
-    private var sensorListeners = mutableListOf<SensorEventListener>()
 
-    private lateinit var locationManager : LocationManager
-    private val locationProviders = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-    private var locationListenersAndData = mutableMapOf<String, Pair<LocationListener, MutableState<String>>>()
+    // alle sensor Objekte als Dictionary, Sensor.TYPE_X jeweils als key
+    private var sensorListeners = mutableMapOf<Int, SensorEventListener>()
+    //private var sensorDataStrings = mutableMapOf<Int, MutableState<String>>()
+    //private var sensorRunnables = mutableMapOf<Int, Runnable>()
+
+
+    private lateinit var locationManager: LocationManager
+    private val locationProviders =
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+    private var locationListenersAndData =
+        mutableMapOf<String, Pair<LocationListener, MutableState<String>>>()
 
     private val locationPermissions = arrayOf(
         android.Manifest.permission.ACCESS_FINE_LOCATION,
         android.Manifest.permission.ACCESS_COARSE_LOCATION
     )
 
-    private lateinit var locationPermissionRequest : ActivityResultLauncher<Array<String>>
-    private var locationPermissionsGranted : Boolean = true
+    private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
+    private var locationPermissionsGranted: Boolean = true
 
     // delayed sensor loop:
     private var handler = Handler() // deprecated TODO update
-    private var runDelayedSensorLoop : Boolean = true
-    private var runnable : Runnable? = null
+    private var runDelayedSensorLoop: Boolean = true
+    private var runnable: Runnable? = null
 
     @Composable
-    private fun PrintSensorData(label: String, dataString: MutableState<String>?, modifier: Modifier = Modifier) {
+    private fun PrintSensorData(
+        label: String,
+        dataString: MutableState<String>?,
+        modifier: Modifier = Modifier
+    ) {
         Text(
             text = buildAnnotatedString {
                 withStyle(
@@ -95,7 +106,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun getMagnitude(values : FloatArray): Float {
+    private fun getMagnitude(values: FloatArray): Float {
         var result = 0.0f
         values.forEach {
             result += it.pow(2)
@@ -103,58 +114,60 @@ class MainActivity : ComponentActivity() {
         return sqrt(result)
     }
 
-    private fun radToDeg(rad : Float): Double {
+    private fun radToDeg(rad: Float): Double {
         return rad * 180 / Math.PI
     }
 
     private fun createListeners() {
         // Sensor Listeners anlegen (1 für jeden sensor_type)
-        SENSOR_TYPES.forEach { _ ->
-            sensorListeners.add(
-                object : SensorEventListener {
-                    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                        // kann leer sein, muss aber implementiert werden
+        SENSOR_TYPES.forEach {
+            sensorListeners[it] = object : SensorEventListener {
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                    // kann leer sein, muss aber implementiert werden
+                }
+
+                override fun onSensorChanged(event: SensorEvent?) {
+                    when (event?.sensor?.type) {
+                        Sensor.TYPE_GYROSCOPE -> {
+                            str_gyrosData.value =
+                                "X: %.2f deg/s\nY: %.2f deg/s\nZ: %.2f deg/s\nMag: %.2f deg/s".format(
+                                    radToDeg(event.values[0]),
+                                    radToDeg(event.values[1]),
+                                    radToDeg(event.values[2]),
+                                    radToDeg(getMagnitude(event.values))
+                                )
+                        }
+
+                        Sensor.TYPE_ACCELEROMETER -> {
+                            str_accelData.value =
+                                "X: %.2f m/s²\nY: %.2f m/s²\nZ: %.2f m/s²\nMag: %.2f m/s²".format(
+                                    event.values[0],
+                                    event.values[1],
+                                    event.values[2],
+                                    getMagnitude(event.values)
+                                )
+                        }
+
+                        Sensor.TYPE_LIGHT -> {
+                            str_lightData.value = "\n${event.values[0].toInt()} lx"
+                        }
+
+                        Sensor.TYPE_MAGNETIC_FIELD -> {
+                            str_magnetData.value =
+                                "X: %.2f uT\nY: %.2f uT\nZ: %.2f uT".format(
+                                    event.values[0],
+                                    event.values[1],
+                                    event.values[2]
+                                )
+                        }
                     }
 
-                    override fun onSensorChanged(event: SensorEvent?) {
-                        when (event?.sensor?.type) {
-                            Sensor.TYPE_GYROSCOPE -> {
-                                str_gyrosData.value =
-                                    "X: %.2f deg/s\nY: %.2f deg/s\nZ: %.2f deg/s\nMag: %.2f deg/s".format(
-                                        radToDeg(event.values[0]),
-                                        radToDeg(event.values[1]),
-                                        radToDeg(event.values[2]),
-                                        radToDeg(getMagnitude(event.values))
-                                    )
-                            }
-                            Sensor.TYPE_ACCELEROMETER -> {
-                                str_accelData.value =
-                                    "X: %.2f m/s²\nY: %.2f m/s²\nZ: %.2f m/s²\nMag: %.2f m/s²".format(
-                                        event.values[0],
-                                        event.values[1],
-                                        event.values[2],
-                                        getMagnitude(event.values)
-                                    )
-                            }
-                            Sensor.TYPE_LIGHT -> {
-                                str_lightData.value = "\n${event.values[0].toInt()} lx"
-                            }
-                            Sensor.TYPE_MAGNETIC_FIELD -> {
-                                str_magnetData.value =
-                                    "X: %.2f uT\nY: %.2f uT\nZ: %.2f uT".format(
-                                        event.values[0],
-                                        event.values[1],
-                                        event.values[2]
-                                    )
-                            }
-                        }
-
-                        if(runDelayedSensorLoop) { // unregister nach 1 readout:
-                            sensorManager.unregisterListener(this)
-                        }
+                    if (runDelayedSensorLoop) { // unregister nach 1 readout:
+                        sensorManager.unregisterListener(this)
                     }
                 }
-            )
+            }
+
         }
 
         // Location Listeners & Data als dictionary mit ["provider"] = Pair<Listener, str_Data>
@@ -165,28 +178,37 @@ class MainActivity : ComponentActivity() {
                 object : LocationListener {
                     override fun onLocationChanged(location: Location) {
                         //Log.d("Location", "Position:\nLatitude: ${location.latitude}\nLongitude: ${location.longitude}")
-                        str_locData.value = "Lat: ${location.latitude}\nLong: ${location.longitude}\nAltitude: ${location.altitude}"
+                        str_locData.value =
+                            "Lat: ${location.latitude}\nLong: ${location.longitude}\nAltitude: ${location.altitude}"
                     }
                 },
-                str_locData)
-        }
-
-    }
-
-    private fun registerAllSensorListeners(sampleFrequencyUs : Int) {
-        SENSOR_TYPES.forEachIndexed { idx, type ->
-            sensorManager.registerListener(
-                sensorListeners[idx],
-                sensorManager.getDefaultSensor(type),
-                sampleFrequencyUs,
-                sampleFrequencyUs
+                str_locData
             )
         }
     }
 
+    private fun registerSensorListener(sensorType : Int, sampleFrequencyUs : Int) {
+        sensorManager.registerListener(
+            sensorListeners[sensorType],
+            sensorManager.getDefaultSensor(sensorType),
+            sampleFrequencyUs,
+            sampleFrequencyUs
+        )
+    }
+
+    private fun unregisterSensorListener(sensorType : Int) {
+        sensorManager.unregisterListener(sensorListeners[sensorType])
+    }
+
+    private fun registerAllSensorListeners(sampleFrequencyUs: Int) {
+        SENSOR_TYPES.forEach {
+            registerSensorListener(it, sampleFrequencyUs)
+        }
+    }
+
     private fun unregisterAllSensorListeners() {
-        sensorListeners.forEach {
-            sensorManager.unregisterListener(it)
+        SENSOR_TYPES.forEach {
+            unregisterSensorListener(it)
         }
     }
 
@@ -194,7 +216,7 @@ class MainActivity : ComponentActivity() {
     // .registerListener(.., samplingPeriodUs) wird für Werte >200ms scheinbar ignoriert
     // und ein postDelayed skript im Listener würde nur die Verarbeitung delayen, nicht das sampling.
     // Also workaround mit delayed register & unregister (im Listener) nach dem ersten readout:
-    private fun startDelayedSensorLoop(sampleFrequencyMs : Long) {
+    private fun startDelayedSensorLoop(sampleFrequencyMs: Long) {
         runnable = object : Runnable {
             override fun run() {
                 registerAllSensorListeners(MIN_SENSOR_DELAY_MS * 1000)
@@ -218,8 +240,8 @@ class MainActivity : ComponentActivity() {
     }
 
     @SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
-    private fun registerLocationListeners(minTimeMs : Long = 1000L) {
-        if(locationPermissionsGranted) {
+    private fun registerLocationListeners(minTimeMs: Long = 1000L) {
+        if (locationPermissionsGranted) {
             // registriere location listener für GPS & NETWORK:
             locationListenersAndData.forEach { (provider, listenerAndData) ->
                 listenerAndData.second.value = "Waiting 4 signal ...\n"
@@ -240,10 +262,10 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private fun startAllSensors(sampleFrequencyMs : Int) {
+    private fun startAllSensors(sampleFrequencyMs: Int) {
         // nutzt .registerListener(..., samplingPeriodUs) für schnelle Frequenzen
         // (ansonsten total unzuverlässig) und einen delayed Loop für langsamere
-        if(sampleFrequencyMs < 200) {
+        if (sampleFrequencyMs < 200) {
             registerAllSensorListeners(sampleFrequencyMs * 1000)
         } else {
             startDelayedSensorLoop(sampleFrequencyMs.toLong())
@@ -281,7 +303,7 @@ class MainActivity : ComponentActivity() {
 
         // TODO shouldShowRequestPermissionRationale(permission) abfragen
         // s. https://developer.android.com/training/permissions/requesting#allow-system-manage-request-code
-        if(!hasAllLocationPermissions()) {
+        if (!hasAllLocationPermissions()) {
             Log.i("LocPermissions", "Check: Location Permissions denied.")
             locationPermissionRequest.launch(locationPermissions)
         } else {
@@ -298,7 +320,9 @@ class MainActivity : ComponentActivity() {
             LumaPraktikum1Theme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(
-                        modifier = Modifier.padding(innerPadding).fillMaxSize(),
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -356,7 +380,7 @@ class MainActivity : ComponentActivity() {
                                     str_lightData.value = "\nSTOPPED\n"
                                     str_magnetData.value = "\nSTOPPED\n"
 
-                                    if(locationPermissionsGranted) {
+                                    if (locationPermissionsGranted) {
                                         locationListenersAndData.forEach { (_, listenerAndData) ->
                                             listenerAndData.second.value = "STOPPED\n"
                                         }
