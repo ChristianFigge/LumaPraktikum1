@@ -45,6 +45,7 @@ import kotlin.math.sqrt
 
 
 class MainActivity : ComponentActivity() {
+    private val MIN_SENSOR_DELAY_MS : Int = 20
     private var str_accelData = mutableStateOf("\nNO DATA YET\n")
     private var str_gyrosData = mutableStateOf("\nNO DATA YET\n")
     private var str_lightData = mutableStateOf("\nNO DATA YET\n")
@@ -107,7 +108,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun createListeners() {
-        // Sensor Listeners anlegen (wichtig: 1 für jeden sensor_type, sonst unregelmäßige readouts)
+        // Sensor Listeners anlegen (1 für jeden sensor_type)
         SENSOR_TYPES.forEach { _ ->
             sensorListeners.add(
                 object : SensorEventListener {
@@ -172,17 +173,18 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    private fun registerSensorListeners(samplingPeriodUs : Int = SensorManager.SENSOR_DELAY_UI) {
+    private fun registerAllSensorListeners(sampleFrequencyUs : Int) {
         SENSOR_TYPES.forEachIndexed { idx, type ->
             sensorManager.registerListener(
                 sensorListeners[idx],
                 sensorManager.getDefaultSensor(type),
-                samplingPeriodUs
+                sampleFrequencyUs,
+                sampleFrequencyUs
             )
         }
     }
 
-    private fun unregisterSensorListeners() {
+    private fun unregisterAllSensorListeners() {
         sensorListeners.forEach {
             sensorManager.unregisterListener(it)
         }
@@ -190,13 +192,13 @@ class MainActivity : ComponentActivity() {
 
     // Für langsame Samplerates:
     // .registerListener(.., samplingPeriodUs) wird für Werte >200ms scheinbar ignoriert
-    // und das selbe postDelayed skript im Listener.onSensorChanged läuft auch nicht.
+    // und ein postDelayed skript im Listener würde nur die Verarbeitung delayen, nicht das sampling.
     // Also workaround mit delayed register & unregister (im Listener) nach dem ersten readout:
-    private fun startDelayedSensorLoop(delayMillis : Long = 1000L) {
+    private fun startDelayedSensorLoop(sampleFrequencyMs : Long) {
         runnable = object : Runnable {
             override fun run() {
-                registerSensorListeners()
-                handler.postDelayed(this, delayMillis) // registriere 1 mal pro sekunde neu
+                registerAllSensorListeners(MIN_SENSOR_DELAY_MS * 1000)
+                handler.postDelayed(this, sampleFrequencyMs)
             }
         }
         handler.post(runnable as Runnable)
@@ -237,9 +239,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+    private fun startAllSensors(sampleFrequencyMs : Int) {
+        // nutzt .registerListener(..., samplingPeriodUs) für schnelle Frequenzen
+        // (ansonsten total unzuverlässig) und einen delayed Loop für langsamere
+        if(sampleFrequencyMs < 200) {
+            registerAllSensorListeners(sampleFrequencyMs * 1000)
+        } else {
+            startDelayedSensorLoop(sampleFrequencyMs.toLong())
+        }
+    }
+
     private fun stopAllReadouts() {
         stopDelayedSensorLoop()
-        unregisterSensorListeners()
+        unregisterAllSensorListeners()
         unregisterLocationListeners()
     }
 
@@ -317,7 +330,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     stopAllReadouts()
                                     runDelayedSensorLoop = false
-                                    registerSensorListeners()
+                                    startAllSensors(MIN_SENSOR_DELAY_MS) //registerAllSensorListeners()
                                     registerLocationListeners(0L)
                                 }
                             )
@@ -327,7 +340,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     stopAllReadouts()
                                     runDelayedSensorLoop = true
-                                    startDelayedSensorLoop(1000L)
+                                    startAllSensors(1000) //startDelayedSensorLoop(1000L)
                                     registerLocationListeners(1000L)
                                 }
                             )
