@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getMagnitude(values : FloatArray): Float {
-        var result : Float = 0.0f
+        var result = 0.0f
         values.forEach {
             result += it.pow(2)
         }
@@ -208,13 +208,13 @@ class MainActivity : ComponentActivity() {
         runnable?.let { handler.removeCallbacks(it) }
     }
 
-    private fun checkLocationPermissions(): Int {
+    private fun hasAllLocationPermissions(): Boolean {
         locationPermissions.forEach {
             if (ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_DENIED) {
-                return PackageManager.PERMISSION_DENIED
+                return false
             }
         }
-        return PackageManager.PERMISSION_GRANTED
+        return true
     }
 
     @SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
@@ -281,7 +281,7 @@ class MainActivity : ComponentActivity() {
 
         // TODO shouldShowRequestPermissionRationale(permission) abfragen
         // s. https://developer.android.com/training/permissions/requesting#allow-system-manage-request-code
-        if(checkLocationPermissions() == PackageManager.PERMISSION_DENIED) {
+        if(!hasAllLocationPermissions()) {
             Log.i("LocPermissions", "Check: Location Permissions denied.")
             locationPermissionRequest.launch(locationPermissions)
         } else {
