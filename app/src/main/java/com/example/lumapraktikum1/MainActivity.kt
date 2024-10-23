@@ -275,9 +275,8 @@ class MainActivity : ComponentActivity() {
     private fun stopSensor(sensorType : Int) {
         if(sensorListeners[sensorType]?.runDelayedLoop == true) {
             stopDelayedSensorLoop(sensorType)
-        } else {
-            unregisterSensorListener(sensorType)
         }
+        unregisterSensorListener(sensorType)
         sensorDataStrings[sensorType]?.value = "\nSTOPPED\n"
     }
 
