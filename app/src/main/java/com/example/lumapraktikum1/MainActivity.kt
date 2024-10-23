@@ -43,27 +43,23 @@ import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+typealias SensorType = Int
 
 class MainActivity : ComponentActivity() {
     private val MIN_SENSOR_DELAY_MS: Int = 20
-    private var str_accelData = mutableStateOf("\nNO DATA YET\n")
-    private var str_gyrosData = mutableStateOf("\nNO DATA YET\n")
-    private var str_lightData = mutableStateOf("\nNO DATA YET\n")
-    private var str_magnetData = mutableStateOf("\nNO DATA YET\n")
+
     private lateinit var sensorManager: SensorManager
+    private var sensorLoopHandler = Handler(Looper.getMainLooper())
     private val SENSOR_TYPES = listOf(
         Sensor.TYPE_ACCELEROMETER,
         Sensor.TYPE_GYROSCOPE,
         Sensor.TYPE_LIGHT,
         Sensor.TYPE_MAGNETIC_FIELD
     )
-
     // alle sensor Objekte als Dictionary, Sensor.TYPE_X jeweils als key
-    private var sensorListeners = mutableMapOf<Int, LumaticSensorListener>()
-    //private var sensorDataStrings = mutableMapOf<Int, MutableState<String>>()
-    private var sensorRunnables = mutableMapOf<Int, Runnable>()
-    private var sensorLoopHandler = Handler(Looper.getMainLooper())
-
+    private var sensorListeners = mutableMapOf<SensorType, LumaticSensorListener>()
+    private var sensorDataStrings = mutableMapOf<SensorType, MutableState<String>>()
+    private var sensorRunnables = mutableMapOf<SensorType, Runnable>()
 
     private lateinit var locationManager: LocationManager
     private val LOCATION_PROVIDERS = listOf(
@@ -104,9 +100,7 @@ class MainActivity : ComponentActivity() {
 
     private fun getMagnitude(values: FloatArray): Float {
         var result = 0.0f
-        values.forEach {
-            result += it.pow(2)
-        }
+        values.forEach { result += it.pow(2) }
         return sqrt(result)
     }
 
@@ -115,6 +109,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun createListeners() {
+        // mutableString map für Textausgabe der Sensordaten
+        SENSOR_TYPES.forEach {
+            sensorDataStrings[it] = mutableStateOf("\nNO DATA YET\n")
+        }
+
         // Sensor Listeners anlegen (1 für jeden sensor_type)
         SENSOR_TYPES.forEach {
             sensorListeners[it] = object : LumaticSensorListener {
@@ -127,7 +126,7 @@ class MainActivity : ComponentActivity() {
                 override fun onSensorChanged(event: SensorEvent?) {
                     when (event?.sensor?.type) {
                         Sensor.TYPE_GYROSCOPE -> {
-                            str_gyrosData.value =
+                            sensorDataStrings[Sensor.TYPE_GYROSCOPE]?.value =
                                 "X: %.2f deg/s\nY: %.2f deg/s\nZ: %.2f deg/s\nMag: %.2f deg/s".format(
                                     radToDeg(event.values[0]),
                                     radToDeg(event.values[1]),
@@ -137,7 +136,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Sensor.TYPE_ACCELEROMETER -> {
-                            str_accelData.value =
+                            sensorDataStrings[Sensor.TYPE_ACCELEROMETER]?.value =
                                 "X: %.2f m/s²\nY: %.2f m/s²\nZ: %.2f m/s²\nMag: %.2f m/s²".format(
                                     event.values[0],
                                     event.values[1],
@@ -147,12 +146,12 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Sensor.TYPE_LIGHT -> {
-                            str_lightData.value = "\n${event.values[0].toInt()} lx"
+                            sensorDataStrings[Sensor.TYPE_LIGHT]?.value = "\n${event.values[0].toInt()} lx"
                         }
 
                         Sensor.TYPE_MAGNETIC_FIELD -> {
-                            str_magnetData.value =
-                                "X: %.2f uT\nY: %.2f uT\nZ: %.2f uT".format(
+                            sensorDataStrings[Sensor.TYPE_MAGNETIC_FIELD]?.value =
+                                "X: %.2f µT\nY: %.2f µT\nZ: %.2f µT".format(
                                     event.values[0],
                                     event.values[1],
                                     event.values[2]
@@ -165,7 +164,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-
         }
 
         // Location Listeners & Data als dictionary mit ["provider"] = Pair<Listener, str_Data>
@@ -175,7 +173,6 @@ class MainActivity : ComponentActivity() {
             locationListenersAndData[it] = Pair<LocationListener, MutableState<String>>(
                 object : LocationListener {
                     override fun onLocationChanged(location: Location) {
-                        //Log.d("Location", "Position:\nLatitude: ${location.latitude}\nLongitude: ${location.longitude}")
                         str_locData.value =
                             "Lat: ${location.latitude}\nLong: ${location.longitude}\nAltitude: ${location.altitude}"
                     }
@@ -186,21 +183,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun registerSensorListener(sensorType : Int, sampleFrequencyMs : Int, runDelayedLoop : Boolean) {
-        sensorListeners[sensorType]?.runDelayedLoop = runDelayedLoop
+        sensorListeners[sensorType]?.let {
+            it.runDelayedLoop = runDelayedLoop
 
-        // falls nötig invalid user input abfangen & millisec -> mikrosec
-        val freqUs = if (sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
-            MIN_SENSOR_DELAY_MS * 1000
-        } else {
-            sampleFrequencyMs * 1000
+            // falls nötig invalid user input abfangen & millisec -> mikrosec
+            val freqUs = if (sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
+                MIN_SENSOR_DELAY_MS * 1000
+            } else {
+                sampleFrequencyMs * 1000
+            }
+
+            sensorManager.registerListener(
+                it,
+                sensorManager.getDefaultSensor(sensorType),
+                freqUs,
+                freqUs
+            )
         }
-
-        sensorManager.registerListener(
-            sensorListeners[sensorType],
-            sensorManager.getDefaultSensor(sensorType),
-            freqUs,
-            freqUs
-        )
     }
 
     private fun unregisterSensorListener(sensorType : Int) {
@@ -245,7 +244,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun unregisterLocationListener(provider : String) {
-        locationListenersAndData[provider]?.let { locationManager.removeUpdates(it.first) }
+        locationListenersAndData[provider]?.let {
+            locationManager.removeUpdates(it.first)
+            it.second.value = "STOPPED\n"
+        }
     }
 
     private fun registerAllLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
@@ -276,6 +278,7 @@ class MainActivity : ComponentActivity() {
         } else {
             unregisterSensorListener(sensorType)
         }
+        sensorDataStrings[sensorType]?.value = "\nSTOPPED\n"
     }
 
     private fun startAllSensors(sampleFrequencyMs: Int) {
@@ -345,12 +348,12 @@ class MainActivity : ComponentActivity() {
                     ) {
                         // SENSOREN
                         Row() {
-                            PrintSensorData("Accelerometer", str_accelData)
-                            PrintSensorData("Gyroskop", str_gyrosData)
+                            PrintSensorData("Accelerometer", sensorDataStrings[Sensor.TYPE_ACCELEROMETER])
+                            PrintSensorData("Gyroskop", sensorDataStrings[Sensor.TYPE_GYROSCOPE])
                         }
                         Row() {
-                            PrintSensorData("Beleuchtung", str_lightData)
-                            PrintSensorData("Magnetfeld", str_magnetData)
+                            PrintSensorData("Beleuchtung", sensorDataStrings[Sensor.TYPE_LIGHT])
+                            PrintSensorData("Magnetfeld", sensorDataStrings[Sensor.TYPE_MAGNETIC_FIELD])
                         }
 
                         // LOCATIONS
@@ -388,19 +391,7 @@ class MainActivity : ComponentActivity() {
                             Button(
                                 content = { Text("STOP") },
                                 modifier = Modifier.padding(vertical = 20.dp),
-                                onClick = {
-                                    stopAllReadouts()
-                                    str_accelData.value = "\nSTOPPED\n"
-                                    str_gyrosData.value = "\nSTOPPED\n"
-                                    str_lightData.value = "\nSTOPPED\n"
-                                    str_magnetData.value = "\nSTOPPED\n"
-
-                                    if (locationPermissionsGranted) {
-                                        locationListenersAndData.forEach { (_, listenerAndData) ->
-                                            listenerAndData.second.value = "STOPPED\n"
-                                        }
-                                    }
-                                }
+                                onClick = { stopAllReadouts() },
                             )
                         }
                     }
