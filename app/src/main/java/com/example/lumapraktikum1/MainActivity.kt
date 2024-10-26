@@ -46,21 +46,24 @@ import kotlin.math.sqrt
 typealias SensorType = Int
 
 class MainActivity : ComponentActivity() {
+    /*** GLOABLE MEMBER FÜR SENSOREN ***/
+    /* 20ms delay entspricht SENSOR_DELAY_GAME, sollte also garantiert laufen,
+     * ausreichend schnell sein und keine zusätzliche permission brauchen. */
     private val MIN_SENSOR_DELAY_MS: Int = 20
-
     private lateinit var sensorManager: SensorManager
-    private var sensorLoopHandler = Handler(Looper.getMainLooper())
+    private val sensorLoopHandler = Handler(Looper.getMainLooper())
     private val SENSOR_TYPES = listOf(
         Sensor.TYPE_ACCELEROMETER,
         Sensor.TYPE_GYROSCOPE,
         Sensor.TYPE_LIGHT,
         Sensor.TYPE_MAGNETIC_FIELD
     )
-    // alle sensor Objekte als Dictionary, Sensor.TYPE_X jeweils als key
+    /* alle sensor Objekte als Dictionary, mit Sensor.TYPE_XY jeweils als key */
     private var sensorListeners = mutableMapOf<SensorType, LumaticSensorListener>()
     private var sensorDataStrings = mutableMapOf<SensorType, MutableState<String>>()
     private var sensorRunnables = mutableMapOf<SensorType, Runnable>()
 
+    /*** GLOABLE MEMBER FÜR LOCATIONS ***/
     private lateinit var locationManager: LocationManager
     private val LOCATION_PROVIDERS = listOf(
         LocationManager.GPS_PROVIDER,
@@ -69,6 +72,7 @@ class MainActivity : ComponentActivity() {
     private var locationListenersAndData =
         mutableMapOf<String, Pair<LocationListener, MutableState<String>>>()
 
+    /* LOCATION--Permissions */
     private val LOCATION_PERMISSIONS = arrayOf(
         android.Manifest.permission.ACCESS_FINE_LOCATION,
         android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -76,6 +80,217 @@ class MainActivity : ComponentActivity() {
     private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
     private var locationPermissionsGranted: Boolean = true
 
+
+    /***  ------------------------ START Sensor Steuerung ------------------------------ ***/
+    /**
+     * Registriert den Default-Sensor eines Sensor-Typs beim globalen SensorManager.
+     * @param sensorType integer Identifier für den Sensor Typ (z.B. Sensor.TYPE_LIGHT)
+     * @param sampleFrequencyMs gewünschte Sample Geschwindigkeit des Sensors in Millisekunden
+     * @param runDelayedLoop Switch für Loop bei langsameren Sample Geschwindigkeiten (wird intern gehandelt)
+     */
+    private fun registerSensorListener(sensorType : Int, sampleFrequencyMs : Int, runDelayedLoop : Boolean) {
+        sensorListeners[sensorType]?.let {
+            it.runDelayedLoop = runDelayedLoop
+
+            // falls nötig invalid user input abfangen & millisec -> mikrosec
+            val freqUs = if (sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
+                MIN_SENSOR_DELAY_MS * 1000
+            } else {
+                sampleFrequencyMs * 1000
+            }
+
+            sensorManager.registerListener(
+                it,
+                sensorManager.getDefaultSensor(sensorType),
+                freqUs,
+                freqUs
+            )
+        }
+    }
+
+    /**
+     * Meldet Default-Sensor beim globalen SensorManager ab.
+     * @param sensorType integer Identifier für den Sensor Typ (z.B. Sensor.TYPE_LIGHT)
+     */
+    private fun unregisterSensorListener(sensorType : Int) {
+        sensorManager.unregisterListener(sensorListeners[sensorType])
+    }
+
+    /** Startet einen timed loop für den Default-Sensor des gegebenen Typs bei langsameren Samplerates.
+     * @param sensorType integer Identifier für den Sensor Typ (z.B. Sensor.TYPE_LIGHT)
+     * @param sampleFrequencyMs gewünschte Sample Geschwindigkeit des Sensors in Millisekunden
+     */
+    /* Grund: .registerListener(.., samplingPeriodUs) wird für Werte >200ms scheinbar ignoriert
+     * und ein postDelayed skript im Listener würde nur die Verarbeitung delayen, nicht das sampling.
+     * Also workaround mit delayed register & unregister (im Listener) nach dem ersten readout. */
+    private fun startDelayedSensorLoop(sensorType : Int, sampleFrequencyMs : Long) {
+        sensorRunnables[sensorType] = object : Runnable {
+            override fun run() {
+                registerSensorListener(sensorType, MIN_SENSOR_DELAY_MS, true)
+                sensorLoopHandler.postDelayed(this, sampleFrequencyMs)
+            }
+        }
+        sensorLoopHandler.post(sensorRunnables[sensorType] as Runnable)
+    }
+
+    /**
+     * Stoppt den timed loop für den Default-Sensor des gegebenen Typs.
+     * @param sensorType integer Identifier für den Sensor Typ (z.B. Sensor.TYPE_LIGHT)
+     */
+    private fun stopDelayedSensorLoop(sensorType : Int) {
+        sensorRunnables[sensorType]?.let { sensorLoopHandler.removeCallbacks(it) }
+    }
+
+    /**
+     * Startet den Default-Sensor eines gegebenen Sensor Typs.
+     * @param sensorType integer Identifier für den Sensor Typ (z.B. Sensor.TYPE_LIGHT)
+     * @param sampleFrequencyMs gewünschte Sample Geschwindigkeit des Sensors in Millisekunden
+     */
+    private fun startSensor(sensorType : Int, sampleFrequencyMs : Int) {
+        // nutzt .registerListener(..., samplingPeriodUs) für schnelle Frequenzen
+        // (ansonsten total unzuverlässig) und einen delayed Loop für langsamere
+        if (sampleFrequencyMs < 200) {
+            registerSensorListener(sensorType, sampleFrequencyMs, false)
+        } else {
+            startDelayedSensorLoop(sensorType, sampleFrequencyMs.toLong())
+        }
+    }
+
+    /**
+     * Stopt den Default-Sensor eines gegebenen Sensor Typs.
+     * @param sensorType integer Identifier für den Sensor Typ (z.B. Sensor.TYPE_LIGHT)
+     */
+    private fun stopSensor(sensorType : Int) {
+        if(sensorListeners[sensorType]?.runDelayedLoop == true) {
+            stopDelayedSensorLoop(sensorType)
+        }
+        unregisterSensorListener(sensorType)
+        sensorDataStrings[sensorType]?.value = "\nSTOPPED\n"
+    }
+
+    /**
+     * Startet die Default-Sensoren von allen im globalen
+     * SENSOR_TYPES array definierten Sensor Typen.
+     * @param sampleFrequencyMs gewünschte Sample Geschwindigkeit
+     * des Sensors in Millisekunden
+     */
+    private fun startAllSensors(sampleFrequencyMs: Int) {
+        SENSOR_TYPES.forEach {
+            startSensor(it, sampleFrequencyMs)
+        }
+    }
+
+    /**
+     * Stoppt die Default-Sensoren von allen im globalen array
+     * SENSOR_TYPES definierten Sensor Typen.
+     */
+    private fun stopAllSensors() {
+        SENSOR_TYPES.forEach {
+            stopSensor(it)
+        }
+    }
+
+    /**
+     * Berechnet die Magnitude für gegebene (Sensor-)Werte.
+     * @param values array mit den Werten
+     * @return Wurzel der Quadratsumme der Werte
+     */
+    private fun getMagnitude(values: FloatArray): Float {
+        var result = 0.0f
+        values.forEach { result += it.pow(2) }
+        return sqrt(result)
+    }
+
+    /**
+     * Wandelt Radians in Grad um.
+     * @param rad der Radians Wert
+     * @return der entsprechende Grad Wert
+     */
+    private fun radToDeg(rad: Float): Double {
+        return rad * 180 / Math.PI
+    }
+    /***  ---------------------------- ENDE Sensor Steuerung ----------------------- ***/
+
+
+    /***  --------------------------- START Location Steuerung  ---------------------- ***/
+    /**
+     * Prüft, ob alle Location Permissions erteilt wurden (coarse && fine).
+     */
+    private fun hasAllLocationPermissions(): Boolean {
+        LOCATION_PERMISSIONS.forEach {
+            if (ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_DENIED) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /**
+     * Registriert den Location Listener eines gegebenen Providers
+     * beim globalen LocationManager.
+     * @param provider String identifier des Location Providers
+     * ("gps" oder "network" bzw. die entsprechenden Konstanten im LocationManager)
+     * @param minTimeMs gewünschte Mindestgeschwindigkeit der Location-Updates in Millisekunden
+     * @param minDistanceM Minimaldistanz zur letzten bekannten Position in Metern,
+     * die überschritten werden muss für ein Location Update
+     */
+    @SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
+    private fun registerLocationListener(provider : String, minTimeMs: Long, minDistanceM : Float = 0f) {
+        if (locationPermissionsGranted) {
+            locationListenersAndData[provider]?.let {
+                it.second.value = "Waiting 4 signal ...\n"
+                locationManager.requestLocationUpdates(provider, minTimeMs, minDistanceM, it.first)
+            }
+        }
+    }
+
+    /**
+     * Meldet den Location Listener eines gegebenen Providers beim
+     * globalen LocationManager ab.
+     * @param provider String identifier des Location Providers
+     * ("gps" oder "network" bzw. die entsprechenden Konstanten im LocationManager)
+     * */
+    private fun unregisterLocationListener(provider : String) {
+        locationListenersAndData[provider]?.let {
+            locationManager.removeUpdates(it.first)
+            it.second.value = "STOPPED\n"
+        }
+    }
+
+    /**
+     * Registriert die Location Listener für GPS & NETWORK beim globalen LocationManager.
+     * @param minTimeMs gewünschte Mindestgeschwindigkeit der Location-Updates in Millisekunden
+     * @param minDistanceM Minimaldistanz zur letzten bekannten Position in Metern,
+     * die überschritten werden muss für ein Location Update
+     */
+    private fun registerAllLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
+        LOCATION_PROVIDERS.forEach {
+            registerLocationListener(it, minTimeMs, minDistanceM)
+        }
+    }
+
+    private fun unregisterAllLocationListeners() {
+        LOCATION_PROVIDERS.forEach {
+            unregisterLocationListener(it)
+        }
+    }
+    /***  ----------------------- ENDE Location Steuerung  ----------------------- ***/
+
+
+    /***  ---------------------------- APP MAIN -------------------------------- ***/
+    /**
+     * Stoppt alle Datenupdates (Sensoren UND Location).
+     */
+    private fun stopAllReadouts() {
+        stopAllSensors()
+        unregisterAllLocationListeners()
+    }
+
+    /**
+     * Stellt beliebige Textdaten dar.
+     * @param label Überschrift der Daten, wird unterstrichen
+     * @param dataString mutableState des Datenstrings
+     */
     @Composable
     private fun PrintSensorData(
         label: String,
@@ -98,16 +313,10 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun getMagnitude(values: FloatArray): Float {
-        var result = 0.0f
-        values.forEach { result += it.pow(2) }
-        return sqrt(result)
-    }
-
-    private fun radToDeg(rad: Float): Double {
-        return rad * 180 / Math.PI
-    }
-
+    /**
+     * Richtet die Listener für Sensoren- und Location-Services ein,
+     * inklusive der von ihnen für Steuerung und Darstellung benötigten Objekte.
+     */
     private fun createListeners() {
         // mutableString map für Textausgabe der Sensordaten
         SENSOR_TYPES.forEach {
@@ -182,125 +391,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun registerSensorListener(sensorType : Int, sampleFrequencyMs : Int, runDelayedLoop : Boolean) {
-        sensorListeners[sensorType]?.let {
-            it.runDelayedLoop = runDelayedLoop
-
-            // falls nötig invalid user input abfangen & millisec -> mikrosec
-            val freqUs = if (sampleFrequencyMs < MIN_SENSOR_DELAY_MS) {
-                MIN_SENSOR_DELAY_MS * 1000
-            } else {
-                sampleFrequencyMs * 1000
-            }
-
-            sensorManager.registerListener(
-                it,
-                sensorManager.getDefaultSensor(sensorType),
-                freqUs,
-                freqUs
-            )
-        }
-    }
-
-    private fun unregisterSensorListener(sensorType : Int) {
-        sensorManager.unregisterListener(sensorListeners[sensorType])
-    }
-
-    // Für langsame Samplerates:
-    // .registerListener(.., samplingPeriodUs) wird für Werte >200ms scheinbar ignoriert
-    // und ein postDelayed skript im Listener würde nur die Verarbeitung delayen, nicht das sampling.
-    // Also workaround mit delayed register & unregister (im Listener) nach dem ersten readout:
-    private fun startDelayedSensorLoop(sensorType : Int, sampleFrequencyMs : Long) {
-        sensorRunnables[sensorType] = object : Runnable {
-            override fun run() {
-                registerSensorListener(sensorType, MIN_SENSOR_DELAY_MS, true)
-                sensorLoopHandler.postDelayed(this, sampleFrequencyMs)
-            }
-        }
-        sensorLoopHandler.post(sensorRunnables[sensorType] as Runnable)
-    }
-
-    private fun stopDelayedSensorLoop(sensorType : Int) {
-        sensorRunnables[sensorType]?.let { sensorLoopHandler.removeCallbacks(it) }
-    }
-
-    private fun hasAllLocationPermissions(): Boolean {
-        LOCATION_PERMISSIONS.forEach {
-            if (ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_DENIED) {
-                return false
-            }
-        }
-        return true
-    }
-
-    @SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
-    private fun registerLocationListener(provider : String, minTimeMs: Long, minDistanceM : Float = 0f) {
-        if (locationPermissionsGranted) {
-            locationListenersAndData[provider]?.let {
-                it.second.value = "Waiting 4 signal ...\n"
-                locationManager.requestLocationUpdates(provider, minTimeMs, minDistanceM, it.first)
-            }
-        }
-    }
-
-    private fun unregisterLocationListener(provider : String) {
-        locationListenersAndData[provider]?.let {
-            locationManager.removeUpdates(it.first)
-            it.second.value = "STOPPED\n"
-        }
-    }
-
-    private fun registerAllLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
-        LOCATION_PROVIDERS.forEach {
-            registerLocationListener(it, minTimeMs, minDistanceM)
-        }
-    }
-
-    private fun unregisterAllLocationListeners() {
-        LOCATION_PROVIDERS.forEach {
-            unregisterLocationListener(it)
-        }
-    }
-
-    private fun startSensor(sensorType : Int, sampleFrequencyMs : Int) {
-        // nutzt .registerListener(..., samplingPeriodUs) für schnelle Frequenzen
-        // (ansonsten total unzuverlässig) und einen delayed Loop für langsamere
-        if (sampleFrequencyMs < 200) {
-            registerSensorListener(sensorType, sampleFrequencyMs, false)
-        } else {
-            startDelayedSensorLoop(sensorType, sampleFrequencyMs.toLong())
-        }
-    }
-
-    private fun stopSensor(sensorType : Int) {
-        if(sensorListeners[sensorType]?.runDelayedLoop == true) {
-            stopDelayedSensorLoop(sensorType)
-        }
-        unregisterSensorListener(sensorType)
-        sensorDataStrings[sensorType]?.value = "\nSTOPPED\n"
-    }
-
-    private fun startAllSensors(sampleFrequencyMs: Int) {
-        SENSOR_TYPES.forEach {
-            startSensor(it, sampleFrequencyMs)
-        }
-    }
-
-    private fun stopAllSensors() {
-        SENSOR_TYPES.forEach {
-            stopSensor(it)
-        }
-    }
-
-    private fun stopAllReadouts() {
-        stopAllSensors()
-        unregisterAllLocationListeners()
-    }
-
+    /**
+     * Startet App, prüft/erteilt Permissions und definiert GUI.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // PERMISSION Request Launcher definieren:
+        /*** ------------- START Permission Handling ----------- ***/
+        /* Request Launcher definieren: */
         locationPermissionRequest =
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
@@ -320,7 +418,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-        // TODO shouldShowRequestPermissionRationale(permission) abfragen
+        /* Erteilte Permissions checken und ggf. mit dem Launcher requesten: */
+        // TODO shouldShowRequestPermissionRationale(permission) abfragen?
         // s. https://developer.android.com/training/permissions/requesting#allow-system-manage-request-code
         if (!hasAllLocationPermissions()) {
             Log.i("LocPermissions", "Check: Location Permissions denied.")
@@ -328,12 +427,14 @@ class MainActivity : ComponentActivity() {
         } else {
             Log.i("LocPermissions", "Check: Location Permissions granted.")
         }
+        /*** ------------- ENDE Permission Handling ----------- ***/
 
+        /*** ------------- INIT Manager & Listener ------------ ***/
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
         this.createListeners()
 
+        /*** ------------------- GUI DEF --------------------- ***/
         enableEdgeToEdge()
         setContent {
             LumaPraktikum1Theme {
