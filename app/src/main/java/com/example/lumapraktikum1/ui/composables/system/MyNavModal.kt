@@ -1,5 +1,6 @@
 package com.example.lumapraktikum1.ui.composables.system
 
+import DataCollector
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -37,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.lumapraktikum1.core.SaveSensorDataService
+import com.example.lumapraktikum1.core.createSensorDataApi
 import com.example.lumapraktikum1.model.NavigationItem
 import com.example.lumapraktikum1.ui.composables.sensor.AllSensorComposable
 import com.example.lumapraktikum1.ui.composables.sensor.LocationComposable
@@ -45,6 +48,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyNavModal() {
+    val sensorDataRemoteApi= createSensorDataApi()
+    val dataCollector=DataCollector("Peter")
+    val saveSensorDataService= SaveSensorDataService(sensorDataRemoteApi,dataCollector)
+
     val navController = rememberNavController()
     val items = listOf(
         NavigationItem(
@@ -154,7 +161,8 @@ fun MyNavModal() {
                     }
 
                     composable("everything"){
-                        AllSensorComposable(navController)
+
+                        AllSensorComposable(saveSensorDataService,navController)
                     }
                 }
             }

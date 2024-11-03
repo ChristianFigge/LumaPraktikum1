@@ -5,5 +5,4 @@ data class LocationReading(
     val lat: Double,
     val long: Double,
     val altitude: Double,
-    val magnitude: Float,
 )

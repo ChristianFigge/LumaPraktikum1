@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavController
 import com.example.lumapraktikum1.LumaticSensorListener
+import com.example.lumapraktikum1.core.SaveSensorDataService
 import com.example.lumapraktikum1.ui.composables.system.LifeCycleHookWrapper
 import java.util.Locale
 import kotlin.math.pow
@@ -44,6 +45,7 @@ typealias SensorType = Int
 
 @Composable
 fun AllSensorComposable(
+    saveSensorDataService: SaveSensorDataService,
     navController: NavController
 ){
 
@@ -63,7 +65,7 @@ fun AllSensorComposable(
                 /*** ------------- INIT Manager & Listener ------------ ***/
                 sensorManager = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
                 locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                createListeners()
+                createListeners(saveSensorDataService)
 
 
             }
@@ -389,7 +391,9 @@ fun AllSensorComposable(
      * Richtet die Listener für Sensoren- und Location-Services ein,
      * inklusive der von ihnen für Steuerung und Darstellung benötigten Objekte.
      */
-    private fun createListeners() {
+    private fun createListeners(
+        saveSensorDataService: SaveSensorDataService
+        ) {
         // mutableString map für Textausgabe der Sensordaten
         SENSOR_TYPES.forEach {
             sensorDataStrings[it] = mutableStateOf("\nNO DATA YET\n")
@@ -407,6 +411,7 @@ fun AllSensorComposable(
                 override fun onSensorChanged(event: SensorEvent?) {
                     when (event?.sensor?.type) {
                         Sensor.TYPE_GYROSCOPE -> {
+                            saveSensorDataService.saveGyroscopeData(event)
                             sensorDataStrings[Sensor.TYPE_GYROSCOPE]?.value =
                                 "X: %.2f deg/s\nY: %.2f deg/s\nZ: %.2f deg/s\nMag: %.2f deg/s".format(
                                     radToDeg(event.values[0]),
@@ -417,6 +422,7 @@ fun AllSensorComposable(
                         }
 
                         Sensor.TYPE_ACCELEROMETER -> {
+                            saveSensorDataService.saveAccelerometerData(event)
                             sensorDataStrings[Sensor.TYPE_ACCELEROMETER]?.value =
                                 "X: %.2f m/s²\nY: %.2f m/s²\nZ: %.2f m/s²\nMag: %.2f m/s²".format(
                                     event.values[0],
@@ -431,6 +437,7 @@ fun AllSensorComposable(
                         }
 
                         Sensor.TYPE_MAGNETIC_FIELD -> {
+                            saveSensorDataService.saveMagnetometerData(event)
                             sensorDataStrings[Sensor.TYPE_MAGNETIC_FIELD]?.value =
                                 "X: %.2f µT\nY: %.2f µT\nZ: %.2f µT".format(
                                     event.values[0],
