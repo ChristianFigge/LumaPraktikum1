@@ -3,6 +3,11 @@ package com.example.lumapraktikum1
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.content.Intent.CATEGORY_DEFAULT
+import android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+import android.content.Intent.FLAG_ACTIVITY_NO_HISTORY
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -10,9 +15,11 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,6 +53,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContentProviderCompat.requireContext
 import com.example.lumapraktikum1.ui.composables.AllSensorComposable
 import com.example.lumapraktikum1.ui.composables.MyNavModal
 
@@ -68,6 +76,26 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        initLocationPermissionRequest()
+
+        /* Erteilte Permissions checken und ggf. mit dem Launcher requesten: */
+// TODO shouldShowRequestPermissionRationale(permission) abfragen?
+// s. https://developer.android.com/training/permissions/requesting#allow-system-manage-request-code
+        if (!hasAllLocationPermissions(this, LOCATION_PERMISSIONS)) {
+            Log.i("LocPermissions", "Check: Location Permissions denied.")
+            locationPermissionRequest.launch(LOCATION_PERMISSIONS)
+        } else {
+            Log.i("LocPermissions", "Check: Location Permissions granted.")
+        }
+
+        setContent {
+            LumaPraktikum1Theme {
+                PermissionComposible()
+            }
+        }
+    }
+
+    fun initLocationPermissionRequest() {
         /* Request Launcher definieren: */
         locationPermissionRequest =
             registerForActivityResult(
@@ -87,22 +115,6 @@ class MainActivity : ComponentActivity() {
                     Log.i("LocPermissions", "Request: Location Permissions denied.")
                 }
             }
-
-        /* Erteilte Permissions checken und ggf. mit dem Launcher requesten: */
-// TODO shouldShowRequestPermissionRationale(permission) abfragen?
-// s. https://developer.android.com/training/permissions/requesting#allow-system-manage-request-code
-        if (!hasAllLocationPermissions(this, LOCATION_PERMISSIONS)) {
-            Log.i("LocPermissions", "Check: Location Permissions denied.")
-            locationPermissionRequest.launch(LOCATION_PERMISSIONS)
-        } else {
-            Log.i("LocPermissions", "Check: Location Permissions granted.")
-        }
-
-        setContent {
-            LumaPraktikum1Theme {
-                PermissionComposible()
-            }
-        }
     }
 
     @Composable
@@ -119,12 +131,35 @@ class MainActivity : ComponentActivity() {
             MyNavModal()
         }
         else {
-            Button(onClick = { locationPermissionRequest.launch(LOCATION_PERMISSIONS) }) { }
+            Column (
+                modifier = Modifier
+                    .padding(30.dp)
+                    .fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ){
+                Text(text = "Für diese App werden Lokalisierungs Berechtigungen benötigt.",
+                    textAlign = TextAlign.Center)
+                Button(
+                    onClick = {
+                        val intent = Intent(ACTION_APPLICATION_DETAILS_SETTINGS)
+                        with(intent) {
+                            data = Uri.fromParts("package", getPackageName(), null)
+                            addCategory(CATEGORY_DEFAULT)
+                            addFlags(FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+                        }
+                        startActivity(intent)
+                    },
+                ) { Text("Einstellungen öffnen") }
+            }
         }
 
     }
 
 }
+
+
 
 private fun hasAllLocationPermissions(ctx: Context, LOCATION_PERMISSIONS: Array<String>): Boolean {
     LOCATION_PERMISSIONS.forEach {
