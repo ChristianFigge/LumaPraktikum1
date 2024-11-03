@@ -1,21 +1,15 @@
-package com.example.lumapraktikum1.ui.composables
+package com.example.lumapraktikum1.ui.composables.sensor
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,11 +30,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavController
 import com.example.lumapraktikum1.LumaticSensorListener
-import kotlinx.coroutines.launch
+import com.example.lumapraktikum1.ui.composables.system.LifeCycleHookWrapper
 import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -62,6 +55,9 @@ fun AllSensorComposable(
                 //sensorManager!!.unregisterListener(sensorGyroscopeEventListener)
                 unregisterAllLocationListeners()
             } else if (event == Lifecycle.Event.ON_CREATE) {
+
+
+                /*** ------------- INIT Manager & Listener ------------ ***/
 
 
                 /*** ------------- INIT Manager & Listener ------------ ***/

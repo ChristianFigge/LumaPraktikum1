@@ -1,4 +1,4 @@
-package com.example.lumapraktikum1.ui.composables
+package com.example.lumapraktikum1.ui.composables.system
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
