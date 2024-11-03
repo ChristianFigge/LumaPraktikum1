@@ -1,4 +1,4 @@
-package com.example.lumapraktikum1.ui.composables.sensor
+package com.example.lumapraktikum1.ui.composables.location
 
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Surface
