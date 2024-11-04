@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
-import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
@@ -91,7 +90,7 @@ class MainActivity : ComponentActivity() {
         LocationManager.NETWORK_PROVIDER    // = "network"
     )
     private var locationListenersAndData =
-        mutableMapOf<String, Pair<LocationListener, MutableState<String>>>()
+        mutableMapOf<String, Pair<LumaticLocationListener, MutableState<String>>>()
 
     /* LOCATION--Permissions */
     private val LOCATION_PERMISSIONS = arrayOf(
@@ -349,7 +348,7 @@ class MainActivity : ComponentActivity() {
             val newListener = LumaticLocationListener(it, newDataStr, newMapView)
             sliderValues[it] = mutableFloatStateOf(1000f)
 
-            locationListenersAndData[it] = Pair<LocationListener, MutableState<String>>(newListener, newDataStr)
+            locationListenersAndData[it] = Pair<LumaticLocationListener, MutableState<String>>(newListener, newDataStr)
             dataCollectors.add(newListener)
             listenerIsRunning[it] = mutableStateOf(false)
         }
@@ -610,7 +609,13 @@ class MainActivity : ComponentActivity() {
                             Button(
                                 content = { Text("Clear All") },
                                 modifier = Modifier.padding(horizontal = 10.dp),
-                                onClick = { clearAllData(); strFileContents.value = ""}
+                                onClick = {
+                                    clearAllData()
+                                    strFileContents.value = ""
+                                    locationListenersAndData.values.forEach { listenerAndData ->
+                                        listenerAndData.first.removeMarker()
+                                    }
+                                }
                             )
                             Button(
                                 content = { Text("Load All") },
