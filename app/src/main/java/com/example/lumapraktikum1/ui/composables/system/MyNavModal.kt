@@ -29,7 +29,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -108,7 +108,7 @@ fun MyNavModal() {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         var selectedItemIndex by rememberSaveable {
-            mutableStateOf(0)
+            mutableIntStateOf(0)
         }
         ModalNavigationDrawer(
             drawerContent = {
@@ -181,17 +181,12 @@ fun MyNavModal() {
                     }
 
                     composable("everything"){
-                        AllSensorComposable(navController)
+                        AllSensorComposable( saveSensorDataService, navController)
                     }
 
                     composable("location") {
                         LocationComposable(navController)
                     }
-
-
-                    composable("everything"){
-
-                        AllSensorComposable(saveSensorDataService,navController)
 
                     composable("gyroscope"){
                         GyroscopeComposable(navController)

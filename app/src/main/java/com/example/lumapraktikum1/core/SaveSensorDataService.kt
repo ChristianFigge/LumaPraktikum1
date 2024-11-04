@@ -2,9 +2,9 @@ package com.example.lumapraktikum1.core
 
 import DataCollector
 import android.hardware.SensorEvent
+import com.example.lumapraktikum1.model.AccelerationReading
+import com.example.lumapraktikum1.model.GyroscopeReading
 import com.example.lumapraktikum1.model.MagnetometerReading
-import de.codlin.MissionPossible.model.AccelerationReading
-import de.codlin.MissionPossible.model.GyroscopeReading
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

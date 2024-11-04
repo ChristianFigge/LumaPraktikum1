@@ -1,8 +1,8 @@
 package com.example.lumapraktikum1.core
 
+import com.example.lumapraktikum1.model.AccelerationReading
+import com.example.lumapraktikum1.model.GyroscopeReading
 import com.example.lumapraktikum1.model.MagnetometerReading
-import de.codlin.MissionPossible.model.AccelerationReading
-import de.codlin.MissionPossible.model.GyroscopeReading
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
