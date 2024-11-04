@@ -1,5 +1,7 @@
 package com.example.lumapraktikum1.ui.composables.location
 
+import android.content.Context
+import android.preference.PreferenceManager
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -9,13 +11,16 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavHostController
+import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 
 @Composable
-fun LocationComposable(navController: NavHostController) {
-    val gpBochum = GeoPoint(51.4818,7.2162)
+fun LocationComposable(navController: NavHostController, ctx: Context) {
+    val gpBochum = GeoPoint(51.4818, 7.2162)
+    Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
+    Configuration.getInstance().userAgentValue = "MapApp"
     Surface(Modifier.height(500.dp)) {
         AndroidView(
             modifier = Modifier,

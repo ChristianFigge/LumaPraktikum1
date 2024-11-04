@@ -89,17 +89,11 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun PermissionComposible() {
-        //var permissionGranted by remember { mutableStateOf(locationPermissionsGranted) }
-
-        //LaunchedEffect(locationPermissionsGranted) {
-        //    permissionGranted = locationPermissionsGranted
-        //    println("permissionGranted " + permissionGranted)
-        //}
 
         locationPermissionsGranted.value = hasAllLocationPermissions(this, LOCATION_PERMISSIONS)
 
         if (locationPermissionsGranted.value) {
-            MyNavModal()
+            MyNavModal(ctx = getApplicationContext())
         } else {
             Column(
                 modifier = Modifier
@@ -109,7 +103,7 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Für diese App werden Lokalisierungs Berechtigungen benötigt.",
+                    text = "Für diese App werden genaue Lokalisierungs Berechtigungen benötigt.",
                     textAlign = TextAlign.Center
                 )
                 Button(
@@ -126,11 +120,8 @@ class MainActivity : ComponentActivity() {
                 ) { Text("Einstellungen öffnen") }
             }
         }
-
     }
-
 }
-
 
 private fun hasAllLocationPermissions(ctx: Context, LOCATION_PERMISSIONS: Array<String>): Boolean {
     LOCATION_PERMISSIONS.forEach {

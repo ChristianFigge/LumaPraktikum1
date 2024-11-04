@@ -1,6 +1,7 @@
 package com.example.lumapraktikum1.ui.composables.system
 
 import DataCollector
+import android.content.Context
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -41,19 +42,19 @@ import androidx.navigation.compose.rememberNavController
 import com.example.lumapraktikum1.core.SaveSensorDataService
 import com.example.lumapraktikum1.core.createSensorDataApi
 import com.example.lumapraktikum1.model.NavigationItem
-import com.example.lumapraktikum1.ui.composables.sensor.AllSensorComposable
-import com.example.lumapraktikum1.ui.composables.sensor.gyroscope.GyroscopeComposable
 import com.example.lumapraktikum1.ui.composables.location.LocationComposable
+import com.example.lumapraktikum1.ui.composables.sensor.AllSensorComposable
 import com.example.lumapraktikum1.ui.composables.sensor.accelorometer.AccelorometerComposable
+import com.example.lumapraktikum1.ui.composables.sensor.gyroscope.GyroscopeComposable
 import com.example.lumapraktikum1.ui.composables.sensor.light.LightComposable
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyNavModal() {
-    val sensorDataRemoteApi= createSensorDataApi()
-    val dataCollector=DataCollector("Peter")
-    val saveSensorDataService= SaveSensorDataService(sensorDataRemoteApi,dataCollector)
+fun MyNavModal(ctx: Context) {
+    val sensorDataRemoteApi = createSensorDataApi()
+    val dataCollector = DataCollector("Peter")
+    val saveSensorDataService = SaveSensorDataService(sensorDataRemoteApi, dataCollector)
 
     val navController = rememberNavController()
     val items = listOf(
@@ -112,15 +113,16 @@ fun MyNavModal() {
         }
         ModalNavigationDrawer(
             drawerContent = {
-                ModalDrawerSheet (
+                ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.background
-                ){
+                ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     items.forEachIndexed { index, item ->
                         NavigationDrawerItem(
                             colors = NavigationDrawerItemDefaults.colors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                unselectedContainerColor = MaterialTheme.colorScheme.background),
+                                unselectedContainerColor = MaterialTheme.colorScheme.background
+                            ),
                             label = {
                                 Text(text = item.title)
                             },
@@ -180,23 +182,23 @@ fun MyNavModal() {
                         HomeComposable(navController)
                     }
 
-                    composable("everything"){
-                        AllSensorComposable( saveSensorDataService, navController)
+                    composable("everything") {
+                        AllSensorComposable(saveSensorDataService, navController)
                     }
 
                     composable("location") {
-                        LocationComposable(navController)
+                        LocationComposable(navController, ctx)
                     }
 
-                    composable("gyroscope"){
+                    composable("gyroscope") {
                         GyroscopeComposable(navController)
                     }
 
-                    composable("acceleration"){
+                    composable("acceleration") {
                         AccelorometerComposable(navController)
                     }
 
-                    composable("light"){
+                    composable("light") {
                         LightComposable(navController)
                     }
                 }
