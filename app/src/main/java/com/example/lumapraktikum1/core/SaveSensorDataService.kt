@@ -28,7 +28,7 @@ class SaveSensorDataService(
     @Synchronized
     fun saveGyroscopeData(event: SensorEvent) {
         dataCollector.collectDatum(event)
-        listGyroscopeData.add(GyroscopeReading(event.timestamp,
+        listGyroscopeData.add(GyroscopeReading(System.currentTimeMillis(),
             event.values[0],
             event.values[1],
             event.values[2]))
@@ -43,7 +43,7 @@ class SaveSensorDataService(
     fun saveAccelerometerData(event: SensorEvent) {
         dataCollector.collectDatum(event)
         listAccelerometerData.add(
-            AccelerationReading(event.timestamp,
+            AccelerationReading(System.currentTimeMillis(),
             event.values[0],
             event.values[1],
             event.values[2])
@@ -59,7 +59,7 @@ class SaveSensorDataService(
     fun saveMagnetometerData(event: SensorEvent) {
         dataCollector.collectDatum(event)
         listMagnetometer.add(
-            MagnetometerReading(event.timestamp,
+            MagnetometerReading(System.currentTimeMillis(),
             event.values[0],
             event.values[1],
             event.values[2])
