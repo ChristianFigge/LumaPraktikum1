@@ -26,8 +26,17 @@ class LumaticLocationListener(
 
         super.collectDatum(location)
 
-        mapMarker.setPosition(GeoPoint(location.latitude, location.longitude))
-        mapView.overlays.add(mapMarker)
+        /*** -------------------- MAP MARKER CODE --------------- ***/
+        // Marker pos updaten
+        val newGP = GeoPoint(location.latitude, location.longitude)
+        mapMarker.setPosition(newGP)
+
+        // Beim ersten readout Marker hinzufügen. Updated ansonsten selbstständig
+        if(!mapView.overlays.contains(mapMarker))
+            mapView.overlays.add(mapMarker)
+
+        // Im View zu neuer position springen
+        mapView.controller.setCenter(newGP)
     }
 
     fun removeMarker() {

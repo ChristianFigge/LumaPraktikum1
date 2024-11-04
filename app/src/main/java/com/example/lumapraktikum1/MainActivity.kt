@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
-import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
@@ -19,9 +18,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.rememberScrollableState
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,26 +30,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -61,12 +52,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import com.example.lumapraktikum1.ui.theme.LumaPraktikum1Theme
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import java.io.FileNotFoundException
@@ -117,7 +106,7 @@ class MainActivity : ComponentActivity() {
     private val dataCollectors = mutableListOf<DataCollector>()
 
     /*** MEMBER FÜR SLIDER ***/
-    private val sliderValues = mutableMapOf<String, MutableState<Float>>();
+    private val sliderValues = mutableMapOf<String, MutableState<Float>>()
     private val listenerIsRunning = mutableMapOf<String, MutableState<Boolean>>()
     private val mapViews = mutableMapOf<String, MapView>()
 
@@ -196,7 +185,7 @@ class MainActivity : ComponentActivity() {
         } else {
             startDelayedSensorLoop(sensorType, sampleFrequencyMs.toLong())
         }
-        listenerIsRunning[SENSOR_TYPES[sensorType] /* get name str */]?.value = true;
+        listenerIsRunning[SENSOR_TYPES[sensorType] /* get name str */]?.value = true
     }
 
     /**
@@ -209,21 +198,14 @@ class MainActivity : ComponentActivity() {
         }
         unregisterSensorListener(sensorType)
         sensorDataStrings[sensorType]?.value = "\nSTOPPED\n"
-        listenerIsRunning[SENSOR_TYPES[sensorType] /* get name str */]?.value = false;
+        listenerIsRunning[SENSOR_TYPES[sensorType] /* get name str */]?.value = false
     }
 
     /**
      * Startet die Default-Sensoren von allen im globalen
      * SENSOR_TYPES array definierten Sensor Typen.
-     * @param sampleFrequencyMs gewünschte Sample Geschwindigkeit
-     * des Sensors in Millisekunden
+     * Nutzt die aktuelle Slider Stellung für den Delay Wert.
      */
-    private fun startAllSensors(sampleFrequencyMs: Int) {
-        SENSOR_TYPES.keys.forEach {
-            startSensor(it, sampleFrequencyMs)
-        }
-    }
-
     private fun startAllSensors() {
         SENSOR_TYPES.forEach { (type, name) ->
             sliderValues[name]?.value?.roundToInt()?.let { startSensor(type, it) }
@@ -291,16 +273,10 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Registriert die Location Listener für GPS & NETWORK beim globalen LocationManager.
-     * @param minTimeMs gewünschte Mindestgeschwindigkeit der Location-Updates in Millisekunden
+     * Nutzt die aktuelle Slider Stellung für die Abfragegeschwindigkeit.
      * @param minDistanceM Minimaldistanz zur letzten bekannten Position in Metern,
      * die überschritten werden muss für ein Location Update
      */
-    private fun registerAllLocationListeners(minTimeMs: Long, minDistanceM : Float = 0f) {
-        LOCATION_PROVIDERS.forEach {
-            registerLocationListener(it, minTimeMs, minDistanceM)
-        }
-    }
-
     private fun registerAllLocationListeners(minDistanceM : Float = 0f) {
         LOCATION_PROVIDERS.forEach {
             sliderValues[it]?.value?.roundToLong()?.let{ minTimeMs ->
@@ -328,7 +304,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun readAllDataFromStorage() : String {
-        var strOut = StringBuilder()
+        val strOut = StringBuilder()
         dataCollectors.forEach {
             strOut.append("${it.name} data:\n\n")
             try {
@@ -466,41 +442,6 @@ class MainActivity : ComponentActivity() {
                     stopSensor(sensorType)
                 }
             })
-            /*
-            sliderValues[sensorName]?.value?.let { sliderValue ->
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Box(contentAlignment = Alignment.Center,) {
-                        Text(
-                            text = "Sample speed: ${sliderValue.roundToInt()}ms",
-                            modifier = Modifier.padding(bottom = 40.dp)
-                        )
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { sliderValues[sensorName]!!.value = it },
-                            valueRange = 0f..5000f,
-                            steps = 19,
-                            enabled = !sensorIsRunning!!.value,
-                            modifier = Modifier.width(200.dp)
-                        )
-                    }
-
-                    Button(
-                        content = {
-                            if (!sensorIsRunning!!.value) Text("Start")
-                            else Text("Stop")
-                        },
-                        onClick = {
-                            if (!sensorIsRunning!!.value) {
-                                startSensor(sensorType, sliderValue.roundToInt())
-                            } else {
-                                stopSensor(sensorType)
-                            }
-                        },
-                        modifier = Modifier.padding(bottom = 20.dp, start = 20.dp),
-                    )
-                }
-            }
-            */
         }
     }
 
@@ -529,42 +470,6 @@ class MainActivity : ComponentActivity() {
                 },
                 modifier = Modifier.padding(top=10.dp)
             )
-            /*
-            sliderValues[locProvider]?.value?.let { sliderValue ->
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Box(contentAlignment = Alignment.Center,) {
-                        Text(
-                            text = "Sample speed: ${sliderValue.roundToInt()}ms",
-                            modifier = Modifier.padding(bottom = 40.dp)
-                        )
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { sliderValues[locProvider]!!.value = it },
-                            valueRange = 0f..5000f,
-                            steps = 19,
-                            enabled = !sensorIsRunning!!.value,
-                            modifier = Modifier.width(200.dp)
-                        )
-                    }
-
-                    Button(
-                        content = {
-                            if (!sensorIsRunning!!.value) Text("Start")
-                            else Text("Stop")
-                        },
-                        onClick = {
-                            if (!sensorIsRunning!!.value) {
-                                //startSensor(sensorType, sliderValue.roundToInt())
-                                registerLocationListener(locProvider, sliderValue.roundToLong())
-                            } else {
-                                unregisterLocationListener(locProvider)
-                            }
-                        },
-                        modifier = Modifier.padding(bottom = 20.dp, start = 20.dp),
-                    )
-                }
-            }
-            */
         }
     }
 
@@ -667,7 +572,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         // LOCATIONS
-                        locationListenersAndData.forEach { (provider, listenerAndData) ->
+                        locationListenersAndData.keys.forEach { provider ->
                             LocationPanel(provider,
                                 Modifier.drawBehind {
                                     drawLine(
