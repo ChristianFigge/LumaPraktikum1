@@ -22,30 +22,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import com.example.lumapraktikum1.ui.composables.system.MyNavModal
-
 import com.example.lumapraktikum1.ui.theme.LumaPraktikum1Theme
 
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
-    private var locationPermissionsGranted: Boolean = false
 
     private val LOCATION_PERMISSIONS = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION
     )
+
+    val locationPermissionsGranted = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,11 +73,11 @@ class MainActivity : ComponentActivity() {
             ) { isGranted: Map<String, @JvmSuppressWildcards Boolean> ->
                 if (isGranted.containsValue(true)) {
                     // Mindestens eine location permission erteilt (coarse oder fine)
-                    locationPermissionsGranted = true
+                    locationPermissionsGranted.value = true
                     Log.i("LocPermissions", "Request: Location Permissions granted: $isGranted")
                 } else {
                     // Keine permission erteilt
-                    locationPermissionsGranted = false
+                    locationPermissionsGranted.value = false
                     //locationListenersAndData.forEach { (_, listenerAndData) ->
                     //    listenerAndData.second.value =
                     //        "Standortzugriff verweigert\n(Änderbar in Einstellungen)"
@@ -92,28 +88,30 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun PermissionComposible(){
-        var permissionGranted by remember { mutableStateOf(locationPermissionsGranted) }
+    fun PermissionComposible() {
+        //var permissionGranted by remember { mutableStateOf(locationPermissionsGranted) }
 
-        LaunchedEffect(locationPermissionsGranted) {
-            permissionGranted = locationPermissionsGranted
-        }
+        //LaunchedEffect(locationPermissionsGranted) {
+        //    permissionGranted = locationPermissionsGranted
+        //    println("permissionGranted " + permissionGranted)
+        //}
 
-        locationPermissionsGranted = hasAllLocationPermissions(this, LOCATION_PERMISSIONS)
+        locationPermissionsGranted.value = hasAllLocationPermissions(this, LOCATION_PERMISSIONS)
 
-        if(permissionGranted) {
+        if (locationPermissionsGranted.value) {
             MyNavModal()
-        }
-        else {
-            Column (
+        } else {
+            Column(
                 modifier = Modifier
                     .padding(30.dp)
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
-            ){
-                Text(text = "Für diese App werden Lokalisierungs Berechtigungen benötigt.",
-                    textAlign = TextAlign.Center)
+            ) {
+                Text(
+                    text = "Für diese App werden Lokalisierungs Berechtigungen benötigt.",
+                    textAlign = TextAlign.Center
+                )
                 Button(
                     onClick = {
                         val intent = Intent(ACTION_APPLICATION_DETAILS_SETTINGS)
@@ -132,7 +130,6 @@ class MainActivity : ComponentActivity() {
     }
 
 }
-
 
 
 private fun hasAllLocationPermissions(ctx: Context, LOCATION_PERMISSIONS: Array<String>): Boolean {
