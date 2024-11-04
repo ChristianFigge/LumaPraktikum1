@@ -282,7 +282,7 @@ fun AllSensorComposable(
      * @param values array mit den Werten
      * @return Wurzel der Quadratsumme der Werte
      */
-    private fun getMagnitude(values: FloatArray): Float {
+    fun getMagnitude(values: FloatArray): Float {
         var result = 0.0f
         values.forEach { result += it.pow(2) }
         return sqrt(result)

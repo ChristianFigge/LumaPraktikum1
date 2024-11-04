@@ -42,7 +42,10 @@ import com.example.lumapraktikum1.core.SaveSensorDataService
 import com.example.lumapraktikum1.core.createSensorDataApi
 import com.example.lumapraktikum1.model.NavigationItem
 import com.example.lumapraktikum1.ui.composables.sensor.AllSensorComposable
-import com.example.lumapraktikum1.ui.composables.sensor.LocationComposable
+import com.example.lumapraktikum1.ui.composables.sensor.gyroscope.GyroscopeComposable
+import com.example.lumapraktikum1.ui.composables.location.LocationComposable
+import com.example.lumapraktikum1.ui.composables.sensor.accelorometer.AccelorometerComposable
+import com.example.lumapraktikum1.ui.composables.sensor.light.LightComposable
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +65,13 @@ fun MyNavModal() {
             route = "home"
         ),
         NavigationItem(
+            title = "Everything",
+            selectedIcon = Icons.Filled.CheckCircle,
+            unselectedIcon = Icons.Outlined.CheckCircle,
+            navController = navController,
+            route = "everything"
+        ),
+        NavigationItem(
             title = "GPS",
             selectedIcon = Icons.Filled.LocationOn,
             unselectedIcon = Icons.Outlined.LocationOn,
@@ -69,11 +79,25 @@ fun MyNavModal() {
             route = "location"
         ),
         NavigationItem(
-            title = "Everything",
+            title = "Gyroskop",
             selectedIcon = Icons.Filled.CheckCircle,
             unselectedIcon = Icons.Outlined.CheckCircle,
             navController = navController,
-            route = "everything"
+            route = "gyroscope"
+        ),
+        NavigationItem(
+            title = "Accelerometer",
+            selectedIcon = Icons.Filled.CheckCircle,
+            unselectedIcon = Icons.Outlined.CheckCircle,
+            navController = navController,
+            route = "acceleration"
+        ),
+        NavigationItem(
+            title = "Licht",
+            selectedIcon = Icons.Filled.CheckCircle,
+            unselectedIcon = Icons.Outlined.CheckCircle,
+            navController = navController,
+            route = "light"
         ),
     )
 
@@ -156,13 +180,29 @@ fun MyNavModal() {
                         HomeComposable(navController)
                     }
 
+                    composable("everything"){
+                        AllSensorComposable(navController)
+                    }
+
                     composable("location") {
                         LocationComposable(navController)
                     }
 
+
                     composable("everything"){
 
                         AllSensorComposable(saveSensorDataService,navController)
+
+                    composable("gyroscope"){
+                        GyroscopeComposable(navController)
+                    }
+
+                    composable("acceleration"){
+                        AccelorometerComposable(navController)
+                    }
+
+                    composable("light"){
+                        LightComposable(navController)
                     }
                 }
             }

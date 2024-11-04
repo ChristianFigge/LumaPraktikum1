@@ -1,4 +1,4 @@
-package de.codlin.MissionPossible.model
+package com.example.lumapraktikum1.model
 
 
 data class AccelerationReading(

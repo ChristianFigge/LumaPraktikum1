@@ -1,4 +1,4 @@
-package de.codlin.MissionPossible.model
+package com.example.lumapraktikum1.model
 
 
 data class GyroscopeReading(
@@ -6,5 +6,4 @@ data class GyroscopeReading(
     val x: Float,
     val y: Float,
     val z: Float,
-
 )
