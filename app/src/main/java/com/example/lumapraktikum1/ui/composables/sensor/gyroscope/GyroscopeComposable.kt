@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavController
 import com.example.lumapraktikum1.model.GyroscopeReading
-import com.example.lumapraktikum1.ui.composables.sensor.getMagnitude
 import com.example.lumapraktikum1.ui.composables.system.LifeCycleHookWrapper
 import com.example.lumapraktikum1.ui.composables.system.SensorSettingsModal
 import kotlinx.coroutines.launch
@@ -125,13 +124,13 @@ fun GyroscopeComposable(
         Spacer(modifier = Modifier.height(10.dp))
         Row {
             Spacer(modifier = Modifier.width(10.dp))
-            Button(onClick = {isRecording = !isRecording}) { Text("Start Recording") }
+            Button(onClick = { isRecording = !isRecording }) { Text("Start Recording") }
             Spacer(modifier = Modifier.width(10.dp))
-            SensorSettingsModal(setSampleRate = {sampleRate = it})
+            SensorSettingsModal(setSampleRate = { sampleRate = it })
             Spacer(modifier = Modifier.width(10.dp))
         }
         Spacer(modifier = Modifier.height(10.dp))
-        GyroscopeDataComposable(allCurrentReadings,25,2)
+        GyroscopeDataComposable(allCurrentReadings, 25, 2)
 
     }
 
