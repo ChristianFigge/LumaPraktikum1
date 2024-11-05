@@ -5,7 +5,9 @@ import android.content.Context
 import android.location.LocationListener
 import android.location.LocationManager
 import android.preference.PreferenceManager
+import android.util.Log
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
@@ -58,7 +60,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     var sampleRateMs by remember { mutableIntStateOf(0) }
     var meterSelection by remember { mutableIntStateOf(1) }
     var isRecording by remember { mutableStateOf(false) }
-    var provider by remember { mutableStateOf(LocationManager.GPS_PROVIDER) }
+    var provider by remember { mutableStateOf(LocationManager.NETWORK_PROVIDER) }
 
 
     val mapCenter = GeoPoint(51.4818, 7.2162)
@@ -82,6 +84,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
 
                     if (isRecording) {
                         allCurrentReadings += singleCurrentLocation
+                        Log.d("Location", "Location Reading added")
                     }
                     if (firstFix) {
                         GeoPoint(singleCurrentLocation.lat, singleCurrentLocation.long)
@@ -116,34 +119,38 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
         onDispose { }
     }
 
-    Surface(Modifier.height(500.dp)) {
+    Surface(Modifier.height(600.dp)) {
         Column {
-            Button(onClick = { isRecording = !isRecording }) { Text("Start Recording") }
-            AndroidView(
-                modifier = Modifier,
-                factory = { context ->
-                    val mapView = MapView(context)
-                    mapView.setTileSource(TileSourceFactory.MAPNIK)
-                    //mapView.setBuiltInZoomControls(true)
-                    mapView.setMultiTouchControls(true)
-                    mapView.setBackgroundColor(Color.Gray.toArgb())
-                    mapView
-                },
-                update = { view ->
-                    // Code to update or recompose the view goes here
-                    // Since geoPoint is read here, the view will recompose whenever it is updated
-                    view.controller.setCenter(mapCenter)
-                    view.controller.setZoom(12.0)
-                    allCurrentReadings.map {
-                        val testMarker = Marker(view)
-                        testMarker.setPosition(mapCenter)
-                        //testMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        view.overlays.add(Marker(view))
-                        //view.getOverlays().add()
+            Button(onClick = {
+                isRecording = !isRecording
+                println(isRecording)
+            }) { Text("Start Recording") }
+            Spacer(Modifier.height(20.dp))
+            Surface(Modifier.height(500.dp)) {
+                AndroidView(
+                    modifier = Modifier,
+                    factory = { context ->
+                        val mapView = MapView(context)
+                        mapView.setTileSource(TileSourceFactory.MAPNIK)
+                        //mapView.setBuiltInZoomControls(true)
+                        mapView.setMultiTouchControls(true)
+                        mapView.setBackgroundColor(Color.Gray.toArgb())
+                        mapView
+                    },
+                    update = { view ->
+                        // Code to update or recompose the view goes here
+                        // Since geoPoint is read here, the view will recompose whenever it is updated
+                        view.controller.setCenter(mapCenter)
+                        view.controller.setZoom(12.0)
+                        allCurrentReadings.forEach { it ->
+                            val testMarker = Marker(view)
+                            testMarker.setPosition(GeoPoint(it.lat, it.long))
+                            view.overlays.add(testMarker)
+                        }
+                        view.invalidate()
                     }
-                    view.invalidate()
-                }
-            )
+                )
+            }
         }
     }
 }
