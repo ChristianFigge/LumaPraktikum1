@@ -1,149 +1,237 @@
 package com.example.lumapraktikum1.ui.composables.location
 
+import DataCollector
 import android.annotation.SuppressLint
 import android.content.Context
-import android.location.LocationListener
 import android.location.LocationManager
 import android.preference.PreferenceManager
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.navigation.NavHostController
-import com.example.lumapraktikum1.model.LocationReading
-import com.example.lumapraktikum1.ui.composables.system.LifeCycleHookWrapper
+import androidx.navigation.NavController
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
+import java.util.Locale
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
-@SuppressLint("MissingPermission")
+private val listenerIsRunning = mutableMapOf<String, MutableState<Boolean>>()
+
+private var locationListenersAndData =
+    mutableMapOf<String, Pair<LumaticLocationListener, MutableState<String>>>()
+// Location Listeners & Data als dictionary mit ["provider"] = Pair<Listener, str_Data>
+
+private val mapViews = mutableMapOf<String, MapView>()
+
+private val sliderValues = mutableMapOf<String, MutableState<Float>>()
+
+private val dataCollectors = mutableListOf<DataCollector>()
+
+private lateinit var locationManager: LocationManager
+
+private val LOCATION_PROVIDERS = listOf(
+    LocationManager.GPS_PROVIDER,       // = "gps"
+    LocationManager.NETWORK_PROVIDER    // = "network"
+)
+
+@SuppressLint("MissingPermission")  // permissions werden in onCreate() erteilt
+private fun registerLocationListener(provider: String, minTimeMs: Long, minDistanceM: Float = 0f) {
+    locationListenersAndData[provider]?.let {
+        it.second.value = "Waiting 4 signal ...\n"
+        locationManager.requestLocationUpdates(provider, minTimeMs, minDistanceM, it.first)
+        listenerIsRunning[provider]?.value = true
+    }
+}
+
+fun createListeners(ctx: Context) {
+    LOCATION_PROVIDERS.forEach {
+        val newDataStr = mutableStateOf("NO DATA YET\n")
+        val newMapView = MapView(ctx)
+        mapViews[it] = newMapView
+        val newListener = LumaticLocationListener(it, newDataStr, newMapView)
+        sliderValues[it] = mutableFloatStateOf(1000f)
+
+        locationListenersAndData[it] =
+            Pair<LumaticLocationListener, MutableState<String>>(newListener, newDataStr)
+        dataCollectors.add(newListener)
+        listenerIsRunning[it] = mutableStateOf(false)
+    }
+}
+
 @Composable
-fun LocationComposable(navController: NavHostController, ctx: Context) {
-
-    var locationManager by remember { mutableStateOf<LocationManager?>(null) }
-    var locationListener by remember { mutableStateOf<LocationListener?>(null) }
-    var firstFix by remember { mutableStateOf(true) }
-
-    var singleCurrentLocation by remember {
-        mutableStateOf<LocationReading>(
-            LocationReading(
-                timestampMillis = System.currentTimeMillis(),
-                long = 0.0,
-                lat = 0.0,
-                altitude = 0.0
-            )
+fun LocationComposable(navController: NavController, ctx: Context) {
+    Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
+    Configuration.getInstance().userAgentValue = "MapApp"
+    locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    createListeners(ctx)
+    locationListenersAndData.keys.forEach { provider ->
+        LocationPanel(provider,
+            Modifier.drawBehind {
+                drawLine(
+                    Color.Gray,
+                    Offset(0f, size.height),
+                    Offset(size.width, size.height),
+                    1.dp.toPx()
+                )
+            }
         )
     }
 
-    var allCurrentReadings by remember {
-        mutableStateOf<List<LocationReading>>(listOf())
+
+}
+
+@Composable
+private fun LocationPanel(locProvider: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        PrintSensorData(
+            "Position (${locProvider.uppercase(Locale.ROOT)})",
+            locationListenersAndData[locProvider]?.second,
+            Modifier.padding(bottom = 10.dp)
+        )
+
+        mapViews[locProvider]?.let { OsmdroidMapView(it) }
+
+        SampleSpeedControl(
+            locProvider,
+            onClick = {
+                if (!listenerIsRunning[locProvider]?.value!!) {
+                    registerLocationListener(
+                        locProvider,
+                        sliderValues[locProvider]?.value!!.roundToLong()
+                    )
+                } else {
+                    unregisterLocationListener(locProvider)
+                }
+            },
+            modifier = Modifier.padding(top = 10.dp)
+        )
     }
+}
 
-    var sampleRateMs by remember { mutableIntStateOf(0) }
-    var meterSelection by remember { mutableIntStateOf(1) }
-    var isRecording by remember { mutableStateOf(false) }
-    var provider by remember { mutableStateOf(LocationManager.GPS_PROVIDER) }
-
-
-    val mapCenter = GeoPoint(51.4818, 7.2162)
-    Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
-    Configuration.getInstance().userAgentValue = "MapApp"
-
-    LifeCycleHookWrapper(
-        attachToDipose = {},
-        onEvent = { _, event ->
-            if (event == Lifecycle.Event.ON_DESTROY) {
-                locationListener?.let { locationManager?.removeUpdates(it) }
-            } else if (event == Lifecycle.Event.ON_CREATE) {
-                locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                locationListener = LocationListener { p0 ->
-                    singleCurrentLocation = LocationReading(
-                        timestampMillis = System.currentTimeMillis(),
-                        long = p0.longitude,
-                        lat = p0.latitude,
-                        altitude = 0.0 //values[2]
-                    )
-
-                    if (isRecording) {
-                        allCurrentReadings += singleCurrentLocation
-                    }
-                    if (firstFix) {
-                        GeoPoint(singleCurrentLocation.lat, singleCurrentLocation.long)
-                        firstFix = false
-                    }
-                }
-
-                locationListener?.let {
-                    locationManager!!.requestLocationUpdates(
-                        provider,
-                        sampleRateMs.toLong(),
-                        meterSelection.toFloat(),
-                        it
-                    )
-                }
-
+@Composable
+private fun SampleSpeedControl(
+    listenerName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..5000f,
+    steps: Int = 19,
+) {
+    val sensorIsRunning = remember { listenerIsRunning[listenerName] }
+    sliderValues[listenerName]?.value?.let { sliderValue ->
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = modifier
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "Sample speed: ${sliderValue.roundToInt()}ms",
+                    modifier = Modifier.padding(bottom = 40.dp)
+                )
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValues[listenerName]!!.value = it },
+                    valueRange = valueRange,
+                    steps = steps,
+                    enabled = !sensorIsRunning!!.value,
+                    modifier = Modifier.width(200.dp)
+                )
             }
-        }
-    )
-
-    DisposableEffect(key1 = sampleRateMs, key2 = meterSelection, key3 = provider) {
-        locationListener?.let { locationManager?.removeUpdates(it) }
-        locationListener?.let {
-            locationManager!!.requestLocationUpdates(
-                provider,
-                sampleRateMs.toLong(),
-                meterSelection.toFloat(),
-                it
-            )
-        }
-
-        onDispose { }
-    }
-
-    Surface(Modifier.height(500.dp)) {
-        Column {
-            Button(onClick = { isRecording = !isRecording }) { Text("Start Recording") }
-            AndroidView(
-                modifier = Modifier,
-                factory = { context ->
-                    val mapView = MapView(context)
-                    mapView.setTileSource(TileSourceFactory.MAPNIK)
-                    //mapView.setBuiltInZoomControls(true)
-                    mapView.setMultiTouchControls(true)
-                    mapView.setBackgroundColor(Color.Gray.toArgb())
-                    mapView
+            Button(
+                onClick = onClick,
+                content = {
+                    if (!sensorIsRunning!!.value) Text("Start")
+                    else Text("Stop")
                 },
-                update = { view ->
-                    // Code to update or recompose the view goes here
-                    // Since geoPoint is read here, the view will recompose whenever it is updated
-                    view.controller.setCenter(mapCenter)
-                    view.controller.setZoom(12.0)
-                    allCurrentReadings.map {
-                        val testMarker = Marker(view)
-                        testMarker.setPosition(mapCenter)
-                        //testMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        view.overlays.add(Marker(view))
-                        //view.getOverlays().add()
-                    }
-                    view.invalidate()
-                }
+                modifier = Modifier.padding(bottom = 20.dp, start = 20.dp),
             )
         }
+    }
+}
+
+private fun unregisterLocationListener(provider: String) {
+    locationListenersAndData[provider]?.let {
+        locationManager.removeUpdates(it.first)
+        it.second.value = "STOPPED\n"
+        listenerIsRunning[provider]?.value = false
+    }
+}
+
+@Composable
+private fun PrintSensorData(
+    label: String,
+    dataString: MutableState<String>?,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = buildAnnotatedString {
+            withStyle(
+                style = SpanStyle(
+                    textDecoration = TextDecoration.Underline
+                )
+            ) {
+                append("$label:\n")
+            }
+            append("${dataString?.value}")
+        },
+        //textAlign = TextAlign.Center,
+        //modifier = modifier,
+        modifier = modifier.wrapContentSize(Alignment.Center)
+    )
+}
+
+@Composable
+fun OsmdroidMapView(mapView: MapView) {
+    val gpBochum = GeoPoint(51.4818, 7.2162)
+    Surface(Modifier.height(400.dp)) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                mapView.setTileSource(TileSourceFactory.MAPNIK)
+                mapView.setBuiltInZoomControls(true)
+                mapView.setMultiTouchControls(true)
+                mapView.setBackgroundColor(Color.Gray.toArgb())
+                mapView
+            },
+            update = { view ->
+                view.controller.setCenter(gpBochum)
+                view.controller.setZoom(12.0)
+            }
+        )
     }
 }
