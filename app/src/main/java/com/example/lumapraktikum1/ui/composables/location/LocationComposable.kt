@@ -124,7 +124,13 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             Button(onClick = {
                 isRecording = !isRecording
                 println(isRecording)
-            }) { Text("Start Recording") }
+            }) {
+                if (!isRecording) {
+                    Text("Start Locating")
+                } else {
+                    Text("Stop Locating")
+                }
+            }
             Spacer(Modifier.height(20.dp))
             Surface(Modifier.height(500.dp)) {
                 AndroidView(

@@ -1,7 +1,5 @@
 package com.example.lumapraktikum1.ui.composables.sensor.light
 
-import com.example.lumapraktikum1.ui.composables.sensor.light.LightDataComposable
-
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -122,13 +120,19 @@ fun LightComposable(
         Spacer(modifier = Modifier.height(10.dp))
         Row {
             Spacer(modifier = Modifier.width(10.dp))
-            Button(onClick = {isRecording = !isRecording}) { Text("Start Recording") }
+            Button(onClick = { isRecording = !isRecording }) {
+                if (!isRecording) {
+                    Text("Start Recording")
+                } else {
+                    Text("Stop Recording")
+                }
+            }
             Spacer(modifier = Modifier.width(10.dp))
-            SensorSettingsModal(setSampleRate = {sampleRate = it})
+            SensorSettingsModal(setSampleRate = { sampleRate = it })
             Spacer(modifier = Modifier.width(10.dp))
         }
         Spacer(modifier = Modifier.height(10.dp))
-        LightDataComposable(allCurrentReadings,25,2)
+        LightDataComposable(allCurrentReadings, 25, 2)
 
     }
 

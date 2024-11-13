@@ -124,13 +124,19 @@ fun AccelorometerComposable(
         Spacer(modifier = Modifier.height(10.dp))
         Row {
             Spacer(modifier = Modifier.width(10.dp))
-            Button(onClick = {isRecording = !isRecording}) { Text("Start Recording") }
+            Button(onClick = { isRecording = !isRecording }) {
+                if (!isRecording) {
+                    Text("Start Recording")
+                } else {
+                    Text("Stop Recording")
+                }
+            }
             Spacer(modifier = Modifier.width(10.dp))
-            SensorSettingsModal(setSampleRate = {sampleRate = it})
+            SensorSettingsModal(setSampleRate = { sampleRate = it })
             Spacer(modifier = Modifier.width(10.dp))
         }
         Spacer(modifier = Modifier.height(10.dp))
-        AccelerometerDataComposable(allCurrentReadings,25,2)
+        AccelerometerDataComposable(allCurrentReadings, 25, 2)
 
     }
 
