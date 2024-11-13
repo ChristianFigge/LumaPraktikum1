@@ -43,6 +43,7 @@ import com.example.lumapraktikum1.core.SaveSensorDataService
 import com.example.lumapraktikum1.core.createSensorDataApi
 import com.example.lumapraktikum1.model.NavigationItem
 import com.example.lumapraktikum1.ui.composables.location.LocationComposable
+import com.example.lumapraktikum1.ui.composables.magnetometer.MagnetometerComposable
 import com.example.lumapraktikum1.ui.composables.sensor.AllSensorComposable
 import com.example.lumapraktikum1.ui.composables.sensor.accelorometer.AccelorometerComposable
 import com.example.lumapraktikum1.ui.composables.sensor.gyroscope.GyroscopeComposable
@@ -99,6 +100,13 @@ fun MyNavModal(ctx: Context) {
             unselectedIcon = Icons.Outlined.CheckCircle,
             navController = navController,
             route = "light"
+        ),
+        NavigationItem(
+            title = "Magnetometer",
+            selectedIcon = Icons.Filled.CheckCircle,
+            unselectedIcon = Icons.Outlined.CheckCircle,
+            navController = navController,
+            route = "magnet"
         ),
     )
 
@@ -200,6 +208,10 @@ fun MyNavModal(ctx: Context) {
 
                     composable("light") {
                         LightComposable(navController)
+                    }
+
+                    composable("magnet") {
+                        MagnetometerComposable(navController)
                     }
                 }
             }
