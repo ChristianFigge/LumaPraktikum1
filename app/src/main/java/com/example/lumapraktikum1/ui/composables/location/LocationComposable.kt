@@ -7,7 +7,9 @@ import android.location.LocationManager
 import android.preference.PreferenceManager
 import android.util.Log
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
@@ -19,6 +21,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -27,6 +30,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
 import com.example.lumapraktikum1.model.LocationReading
+import com.example.lumapraktikum1.core.LumaticRoute
 import com.example.lumapraktikum1.ui.composables.system.LifeCycleHookWrapper
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -63,9 +67,12 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     var provider by remember { mutableStateOf(LocationManager.NETWORK_PROVIDER) }
 
 
+    /*** MapView Init ***/
     val mapCenter = GeoPoint(51.4818, 7.2162)
     Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
     Configuration.getInstance().userAgentValue = "MapApp"
+    var mapView by remember { mutableStateOf(MapView(ctx))}
+    var route by remember { mutableStateOf(LumaticRoute(mapView)) };
 
     LifeCycleHookWrapper(
         attachToDipose = {},
@@ -119,18 +126,16 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
         onDispose { }
     }
 
-    Surface(Modifier.height(600.dp)) {
-        Column {
-            Button(onClick = {
-                isRecording = !isRecording
-                println(isRecording)
-            }) { Text("Start Recording") }
+    Surface(Modifier.fillMaxHeight()) {
+        Column (
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Spacer(Modifier.height(20.dp))
             Surface(Modifier.height(500.dp)) {
                 AndroidView(
                     modifier = Modifier,
                     factory = { context ->
-                        val mapView = MapView(context)
+                        //mapView = MapView(context)
                         mapView.setTileSource(TileSourceFactory.MAPNIK)
                         //mapView.setBuiltInZoomControls(true)
                         mapView.setMultiTouchControls(true)
@@ -150,6 +155,22 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                         view.invalidate()
                     }
                 )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Button(onClick = {
+                isRecording = !isRecording
+                println(isRecording)
+            }) { Text("Start Recording") }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Route Buttons
+            Row() {
+                Button(
+                    onClick = { route.drawRoute(LumaticRoute.RouteID.A) },
+                    content = { Text("Show Route A") })
             }
         }
     }
