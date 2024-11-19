@@ -70,31 +70,40 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     val mapCenter = GeoPoint(51.4818, 7.2162)
     Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
     Configuration.getInstance().userAgentValue = "MapApp"
-    var mapView by remember { mutableStateOf(MapView(ctx))}
-    var route by remember { mutableStateOf(LumaticRoute(mapView)) };
+    val mapView by remember { mutableStateOf(MapView(ctx))}
+    val route by remember { mutableStateOf(LumaticRoute(mapView)) }
 
     fun startRecording() {
-        locationListener?.let {
-            locationManager?.requestLocationUpdates(
-                provider,
-                sampleRateMs.toLong(),
-                meterSelection.toFloat(),
-                it
-            )
+        locationListener?.let { listener ->
+            locationManager?.let { manager ->
+                manager.requestLocationUpdates(
+                    provider,
+                    sampleRateMs.toLong(),
+                    meterSelection.toFloat(),
+                    listener
+                )
+                isRecording = true
+                firstFix = true
+                Log.i("LocReading", "START Location reading")
+            }
         }
-        isRecording = true;
     }
 
     fun stopRecording() {
-        locationListener?.let { locationManager?.removeUpdates(it) }
-        isRecording = false;
+        locationListener?.let { listener ->
+            locationManager?.let { manager ->
+                manager.removeUpdates(listener)
+                isRecording = false
+                Log.i("LocReading", "STOP Location reading")
+            }
+        }
     }
 
     LifeCycleHookWrapper(
         attachToDipose = {},
         onEvent = { _, event ->
             if (event == Lifecycle.Event.ON_DESTROY) {
-                stopRecording();
+                stopRecording()
             } else if (event == Lifecycle.Event.ON_CREATE) {
                 locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
                 locationListener = LocationListener { p0 ->
@@ -114,9 +123,9 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                             reachedWaypoint = false
                             Log.i("Location", "Waypoint Reading added")
                         }
+
                         if (firstFix) {
-                            val gp = GeoPoint(p0.latitude, p0.longitude)
-                            mapView.controller.setCenter(gp)
+                            mapView.controller.setCenter(GeoPoint(p0.latitude, p0.longitude))
                             mapView.controller.setZoom(19.0)
                             firstFix = false
                         }
@@ -127,6 +136,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     )
 
     DisposableEffect(key1 = sampleRateMs, key2 = meterSelection, key3 = provider) {
+        /* Warum sollte er recorden wenn man den Knopf noch nicht gedrückt hat??
         locationListener?.let { locationManager?.removeUpdates(it) }
         locationListener?.let {
             locationManager!!.requestLocationUpdates(
@@ -136,8 +146,8 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                 it
             )
         }
-
-        onDispose { }
+        */
+        onDispose { stopRecording() }
     }
 
     Surface(Modifier.fillMaxHeight()) {
@@ -148,8 +158,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             Surface(Modifier.height(500.dp)) {
                 AndroidView(
                     modifier = Modifier,
-                    factory = { context ->
-                        //mapView = MapView(context)
+                    factory = { _ ->
                         mapView.setTileSource(TileSourceFactory.MAPNIK)
                         //mapView.setBuiltInZoomControls(true)
                         mapView.setMultiTouchControls(true)
@@ -169,16 +178,16 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                             val testMarker = Marker(view)
                             testMarker.setPosition(GeoPoint(it.lat, it.long))
                             view.overlays.add(testMarker)
-                            Log.i("MapViewInfo", "Overlay Count: ${view.overlays.count()}")
+                            Log.i("MapViewInfo", "Overlay Count: ${view.overlays.count()}") // bro
                         }
                         */
                         singleCurrentLocation?.let {
-                            val testMarker = Marker(view)
-                            testMarker.setPosition(GeoPoint(it.lat, it.long))
-                            view.overlays.add(testMarker)
-                            //Log.i("MapViewInfo", "Overlay Count: ${view.overlays.count()}")
+                            val newMarker = Marker(view)
+                            newMarker.setPosition(GeoPoint(it.lat, it.long))
+                            view.overlays.add(newMarker)
                         }
                         view.invalidate()
+                        Log.i("MapViewInfo", "MapView updated")
                     }
                 )
             }
@@ -188,7 +197,6 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             Button(onClick = {
                 if(isRecording) stopRecording()
                 else startRecording()
-                println(isRecording)
             }) {
                 if(isRecording) Text("Stop Recording")
                 else Text("Start Recording")
