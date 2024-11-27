@@ -136,7 +136,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     )
 
     DisposableEffect(key1 = sampleRateMs, key2 = meterSelection, key3 = provider) {
-        /* Warum sollte er recorden wenn man den Knopf noch nicht gedrückt hat??
+        /* Warum sollte der listener laufen wenn man den Knopf noch nicht gedrückt hat?
         locationListener?.let { locationManager?.removeUpdates(it) }
         locationListener?.let {
             locationManager!!.requestLocationUpdates(
@@ -207,7 +207,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             // Route Buttons
             Row() {
                 Button(
-                    onClick = { route.drawRoute(LumaticRoute.RouteID.A) },
+                    onClick = { route.drawRoute(LumaticRoute.RouteID.A, false) },
                     content = { Text("Show Route A") })
             }
 
@@ -217,6 +217,17 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             Button(
                 onClick = { reachedWaypoint = true; },
                 content = { Text("Wegpunkt erreicht") }
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            Button(
+                onClick = {
+                    val routeA = route.getRoutePoints((LumaticRoute.RouteID.A))
+                    val points = route.interpolate(routeA[0], 0, routeA[1], 29300)
+                    route.drawMarkers(points)
+                },
+                content = { Text("Interpolation Test A") }
             )
         }
     }

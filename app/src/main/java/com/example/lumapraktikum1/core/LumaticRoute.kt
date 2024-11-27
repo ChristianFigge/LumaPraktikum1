@@ -6,6 +6,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import kotlin.math.abs
 
 class LumaticRoute(
     private val mapView : MapView
@@ -26,15 +27,15 @@ class LumaticRoute(
         )
     }
 
-    private var mLine : Polyline? = null;
-    private var mMarkers : MutableList<Marker>? = null;
+    private var mLine : Polyline? = null
+    private var mMarkers : MutableList<Marker>? = null
     enum class RouteID { A, B }
 
     /**
      * Polyline factory for closed routes
      */
     private fun initPolyline(points : List<GeoPoint>, color : Int) {
-        mLine = Polyline(); // we need no infowindow
+        mLine = Polyline() // we need no infowindow
 
         // create closed route line
         points.forEach { mLine!!.addPoint(it) }
@@ -58,10 +59,19 @@ class LumaticRoute(
         }
     }
 
+    fun drawMarkers(points: List<GeoPoint>) {
+        points.forEach {
+            val newMarker = Marker(mapView)
+            newMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            newMarker.setPosition(it)
+            mapView.overlays.add(newMarker)
+        }
+    }
+
     /**
      * Draws polyline with(out) waypoint map markers for route A.
      */
-    fun drawRoute(routeId : RouteID, color : Int = Color.Blue.toArgb(), drawMarkers : Boolean = true) {
+    fun drawRoute(routeId : RouteID, drawMarkers : Boolean = true, color : Int = Color.Blue.toArgb()) {
         clearRoute()
 
         val points = when(routeId) {
@@ -88,5 +98,45 @@ class LumaticRoute(
         mapView.overlays.remove(mLine)
         mMarkers?.let { mapView.overlays.removeAll(it) }
         mapView.invalidate()
+    }
+
+    fun getRoutePoints(routeId : RouteID) : MutableList<GeoPoint> {
+        return when(routeId) {
+            RouteID.A -> routeA_points.toMutableList()
+            RouteID.B -> routeB_points.toMutableList()
+        }
+    }
+
+    /**
+     * Interpolates on a straight line between 2 given GeoPoints a, b.
+     * The number of in-between points is floor(abs(bTime - aTime) / step) - 1.
+     * Returns an ordered list containing a, [interpolated points], b.
+     */
+    fun interpolate(
+        a: GeoPoint,
+        aTimeMillis: Long,
+        b : GeoPoint,
+        bTimeMillis: Long,
+        stepMillis: Long = 1000L
+    )
+        : MutableList<GeoPoint>
+    {
+        val nSteps = abs(bTimeMillis - aTimeMillis) / stepMillis // implicit floor
+        val latStep = abs(b.latitude - a.latitude) / nSteps
+        val longStep = abs(b.longitude - a. longitude) / nSteps
+
+        val pointList = mutableListOf<GeoPoint>()
+        for (stepCount in 0..nSteps) {
+            pointList.add(
+                GeoPoint(a.latitude + latStep * stepCount, a.longitude + longStep * stepCount))
+        }
+        return pointList
+    }
+
+    /**
+     * Distance in meters between 2 GeoPoints. Same as a.distanceToAsDouble(b)
+     */
+    fun getDistance(a : GeoPoint, b : GeoPoint) : Double {
+        return a.distanceToAsDouble(b)
     }
 }
