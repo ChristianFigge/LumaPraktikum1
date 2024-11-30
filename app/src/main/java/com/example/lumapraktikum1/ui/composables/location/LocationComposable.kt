@@ -37,6 +37,7 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -71,7 +72,9 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
     Configuration.getInstance().userAgentValue = "MapApp"
     val mapView by remember { mutableStateOf(MapView(ctx))}
-    val route by remember { mutableStateOf(LumaticRoute(mapView)) }
+    val lumaRoutes by remember { mutableStateOf(LumaticRoute(mapView)) }
+    val walkPath by remember { mutableStateOf(Polyline())}
+    walkPath.outlinePaint.color = Color.Red.toArgb()
 
     fun startRecording() {
         locationListener?.let { listener ->
@@ -87,6 +90,12 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                 Log.i("LocReading", "START Location reading")
             }
         }
+
+        // (re-)init walkPath polyline & make sure it's on the current top
+        walkPath.actualPoints.clear()
+        mapView.overlays.remove(walkPath)
+        mapView.overlays.add(walkPath)
+        mapView.invalidate()
     }
 
     fun stopRecording() {
@@ -182,9 +191,17 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                         }
                         */
                         singleCurrentLocation?.let {
+                            val newPoint = GeoPoint(it.lat, it.long)
+
+                            // add walk path Marker
+                            /* (too much clutter)
                             val newMarker = Marker(view)
-                            newMarker.setPosition(GeoPoint(it.lat, it.long))
+                            newMarker.setPosition(newPoint)
                             view.overlays.add(newMarker)
+                            */
+
+                            // add walk path Polyline Point
+                            walkPath.addPoint(newPoint)
                         }
                         view.invalidate()
                         Log.i("MapViewInfo", "MapView updated")
@@ -207,7 +224,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             // Route Buttons
             Row() {
                 Button(
-                    onClick = { route.drawRoute(LumaticRoute.RouteID.A, false) },
+                    onClick = { lumaRoutes.drawRoute(LumaticRoute.RouteID.A) },
                     content = { Text("Show Route A") })
             }
 
@@ -223,9 +240,9 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
 
             Button(
                 onClick = {
-                    val routeA = route.getRoutePoints((LumaticRoute.RouteID.A))
-                    val points = route.interpolate(routeA[0], 0, routeA[1], 29300)
-                    route.drawMarkers(points)
+                    val routeA = lumaRoutes.getRoutePoints((LumaticRoute.RouteID.A))
+                    val points = lumaRoutes.interpolate(routeA[0], 0, routeA[1], 29300)
+                    lumaRoutes.drawMarkers(points)
                 },
                 content = { Text("Interpolation Test A") }
             )

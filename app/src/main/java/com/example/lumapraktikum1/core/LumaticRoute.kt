@@ -2,6 +2,7 @@ package com.example.lumapraktikum1.core
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.example.lumapraktikum1.model.LocationReading
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -13,6 +14,7 @@ class LumaticRoute(
 ) {
     companion object {  // kotlin static?!
         /*** ROUTE DATA ***/
+        // TODO implement maltes/julians routes
         private val routeA_points = listOf(
             GeoPoint(51.44669, 7.27072),
             GeoPoint(51.44804, 7.27376),
@@ -59,6 +61,9 @@ class LumaticRoute(
         }
     }
 
+    /**
+     * Help function for testing: Draws Markers from GeoPoint List on the map.
+     */
     fun drawMarkers(points: List<GeoPoint>) {
         points.forEach {
             val newMarker = Marker(mapView)
@@ -66,6 +71,7 @@ class LumaticRoute(
             newMarker.setPosition(it)
             mapView.overlays.add(newMarker)
         }
+        mapView.invalidate();
     }
 
     /**
@@ -94,6 +100,9 @@ class LumaticRoute(
         mapView.invalidate() // force map refresh
     }
 
+    /**
+     * Remove the currently drawn route from the map, if any.
+     */
     fun clearRoute() {
         mapView.overlays.remove(mLine)
         mMarkers?.let { mapView.overlays.removeAll(it) }
@@ -125,16 +134,60 @@ class LumaticRoute(
         val latStep = abs(b.latitude - a.latitude) / nSteps
         val longStep = abs(b.longitude - a. longitude) / nSteps
 
-        val pointList = mutableListOf<GeoPoint>()
-        for (stepCount in 0..nSteps) {
+        val pointList = mutableListOf<GeoPoint>(a)
+        for (stepCount in 1..<nSteps) {
             pointList.add(
                 GeoPoint(a.latitude + latStep * stepCount, a.longitude + longStep * stepCount))
         }
+        pointList.add(b)
         return pointList
     }
 
     /**
-     * Distance in meters between 2 GeoPoints. Same as a.distanceToAsDouble(b)
+     * Returns distance of 2 LocationReadings in meters.
+     */
+    fun getDistance(a : LocationReading, b : LocationReading) : Double {
+        val gpA = GeoPoint(a.lat, a.long)
+        val gpB = GeoPoint(b.lat, b.long)
+        return gpA.distanceToAsDouble(gpB)
+    }
+
+    /**
+     * Interpolates on a straight line between 2 given LocationReadings a, b.
+     * The number of in-between points is floor(abs(bTime - aTime) / step) - 1.
+     * Returns a list<LocationReading> containing a, [interpolated points], b.
+     */
+    fun interpolate(
+        a : LocationReading,
+        b: LocationReading,
+        stepMillis: Long = 1000L
+    )
+        : MutableList<LocationReading>
+    {
+        val timeDiff = abs(b.timestampMillis - a.timestampMillis)
+        val nSteps = timeDiff / stepMillis // implicit floor
+
+        val latStep = abs(b.lat - a.lat) / nSteps
+        val longStep = abs(b.long - a. long) / nSteps
+        val timeStep = timeDiff / nSteps;
+
+        val pointList = mutableListOf<LocationReading>(a)
+        for (stepCount in 1..<nSteps) {
+            pointList.add(
+                LocationReading(
+                    a.timestampMillis + timeStep * stepCount,
+                    a.lat + latStep * stepCount,
+                    a.long + longStep * stepCount,
+                    0.0
+                )
+            )
+        }
+        pointList.add(b)
+        return pointList
+    }
+
+    /**
+     * Returns distance in meters between 2 GeoPoints. Same as a.distanceToAsDouble(b)
      */
     fun getDistance(a : GeoPoint, b : GeoPoint) : Double {
         return a.distanceToAsDouble(b)
