@@ -58,11 +58,23 @@ class LumaticRoute(
      */
     private fun initMarkerList(points: List<GeoPoint>) {
         mMarkers = mutableListOf<Marker>()
-        points.forEach {
-            val newMarker = Marker(mapView)
-            newMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            newMarker.setPosition(it)
-            mMarkers!!.add(newMarker)
+        points.forEachIndexed { idx, p ->
+            // make sure that there's only one marker on start/finish point
+            // for closed loop routes
+            if(idx+1 == points.size && p == points.first()) {
+                mMarkers!!.firstOrNull()?.let {
+                    it.title += " / #${idx+1}"
+                }
+            }
+            else {
+                val newMarker = Marker(mapView)
+                newMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                newMarker.setPosition(p)
+                newMarker.title = "Route point #${idx+1}"
+                newMarker.subDescription = ""
+                newMarker.snippet = ""
+                mMarkers!!.add(newMarker)
+            }
         }
     }
 
@@ -76,7 +88,7 @@ class LumaticRoute(
             newMarker.setPosition(it)
             mapView.overlays.add(newMarker)
         }
-        mapView.invalidate();
+        mapView.invalidate()
     }
 
     /**
@@ -165,7 +177,7 @@ class LumaticRoute(
 
         val latStep = abs(b.lat - a.lat) / nSteps
         val longStep = abs(b.long - a. long) / nSteps
-        val timeStep = timeDiff / nSteps;
+        val timeStep = timeDiff / nSteps
 
         val pointList = mutableListOf<LocationReading>(a)
         for (stepCount in 1..<nSteps) {
