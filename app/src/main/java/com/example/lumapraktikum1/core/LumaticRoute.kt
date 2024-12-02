@@ -8,41 +8,46 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class LumaticRoute(
     private val mapView : MapView
 ) {
     companion object {  // kotlin static?!
         /*** ROUTE DATA ***/
-        // TODO implement maltes/julians routes
-        private val routeA_points = listOf(
+        // TODO in prakt2 git: Read model, RoutePointModel -> GeoList conv
+        private val routePoints_Julian = listOf(
+            GeoPoint(51.4926391, 7.4150329),
+            GeoPoint(51.4927257, 7.4149413),
+            GeoPoint(51.4926435, 7.4143429),
+            //GeoPoint(51.4926391, 7.4150329), // doppelt?
+            GeoPoint(51.4923991, 7.4143392),
+            GeoPoint(51.492482, 7.415013),
+            GeoPoint(51.4926391, 7.4150329),
+            //GeoPoint(51.4926391, 7.4150329), // doppelt?
+        )
+        // Placeholder! TODO implement maltes route
+        private val routePoints_Malte = listOf(
             GeoPoint(51.44669, 7.27072),
             GeoPoint(51.44804, 7.27376),
             GeoPoint(51.44582, 7.27243),
             GeoPoint(51.44804, 7.27149),
             GeoPoint(51.44667, 7.27428),
         )
-        private val routeB_points = listOf(
-            GeoPoint(51.44669, 7.27072),
-            GeoPoint(51.44804, 7.27376),
-            GeoPoint(51.44582, 7.27243),
-        )
     }
 
     private var mLine : Polyline? = null
     private var mMarkers : MutableList<Marker>? = null
-    enum class RouteID { A, B }
+    enum class RouteID { JULIAN, MALTE }
 
     /**
-     * Polyline factory for closed routes
+     * Polyline factory for displaying routes
      */
     private fun initPolyline(points : List<GeoPoint>, color : Int) {
         mLine = Polyline() // we need no infowindow
 
-        // create closed route line
+        // create polyline
         points.forEach { mLine!!.addPoint(it) }
-        if(points.first() != points.last())
-            mLine!!.addPoint(points.first())
 
         // styling
         mLine!!.outlinePaint.color = color
@@ -81,8 +86,8 @@ class LumaticRoute(
         clearRoute()
 
         val points = when(routeId) {
-            RouteID.A -> routeA_points
-            RouteID.B -> routeB_points
+            RouteID.JULIAN -> routePoints_Julian
+            RouteID.MALTE -> routePoints_Malte
         }
 
         // polyline
@@ -111,8 +116,8 @@ class LumaticRoute(
 
     fun getRoutePoints(routeId : RouteID) : MutableList<GeoPoint> {
         return when(routeId) {
-            RouteID.A -> routeA_points.toMutableList()
-            RouteID.B -> routeB_points.toMutableList()
+            RouteID.JULIAN -> routePoints_Julian.toMutableList()
+            RouteID.MALTE -> routePoints_Malte.toMutableList()
         }
     }
 
@@ -141,15 +146,6 @@ class LumaticRoute(
         }
         pointList.add(b)
         return pointList
-    }
-
-    /**
-     * Returns distance of 2 LocationReadings in meters.
-     */
-    fun getDistance(a : LocationReading, b : LocationReading) : Double {
-        val gpA = GeoPoint(a.lat, a.long)
-        val gpB = GeoPoint(b.lat, b.long)
-        return gpA.distanceToAsDouble(gpB)
     }
 
     /**
@@ -187,9 +183,34 @@ class LumaticRoute(
     }
 
     /**
-     * Returns distance in meters between 2 GeoPoints. Same as a.distanceToAsDouble(b)
+     * Returns distance between 2 LocationReadings in meters.
      */
-    fun getDistance(a : GeoPoint, b : GeoPoint) : Double {
-        return a.distanceToAsDouble(b)
+    fun getDistance(a : LocationReading, b : LocationReading) : Double {
+        val gpA = GeoPoint(a.lat, a.long)
+        val gpB = GeoPoint(b.lat, b.long)
+        return gpA.distanceToAsDouble(gpB)
+    }
+
+    /**
+     * Returns CDF plot points for a given list of distances.
+     * Single Points are stored in Pair<X,Y> with X = Distance rounded to 0.1
+     * and Y = Probability from 0.0 to 1.0 for any distance d <= X
+     */
+    fun getCDFPlotPoints(distances : List<Double>) : List< Pair<Double,Double> > {
+        // Sort distances ascending & round to 0.1 meters
+        val sortedDistances = distances.sorted().map { (it * 10.0).roundToInt() / 10.0 }
+
+        val cdfData = mutableListOf< Pair<Double,Double> >()
+        sortedDistances.forEachIndexed { idx, d ->
+            // Create "frequency bin" on the fly using index count
+            sortedDistances.getOrNull(idx + 1)?.let { next ->
+                if(d == next) return@forEachIndexed // continue
+            }
+
+            // Get the probability for any distance being <= d based on the sample size
+            val cumProbability = (idx + 1).toDouble() / distances.size
+            cdfData.add( Pair(d, cumProbability) )
+        }
+        return cdfData.toList()
     }
 }

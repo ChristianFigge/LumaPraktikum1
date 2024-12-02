@@ -224,8 +224,8 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             // Route Buttons
             Row() {
                 Button(
-                    onClick = { lumaRoutes.drawRoute(LumaticRoute.RouteID.A) },
-                    content = { Text("Show Route A") })
+                    onClick = { lumaRoutes.drawRoute(LumaticRoute.RouteID.JULIAN) },
+                    content = { Text("Show Route JULIAN") })
             }
 
             Spacer(Modifier.height(20.dp))
@@ -240,9 +240,15 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
 
             Button(
                 onClick = {
-                    val routeA = lumaRoutes.getRoutePoints((LumaticRoute.RouteID.A))
+                    val routeA = lumaRoutes.getRoutePoints((LumaticRoute.RouteID.JULIAN))
                     val points = lumaRoutes.interpolate(routeA[0], 0, routeA[1], 29300)
                     lumaRoutes.drawMarkers(points)
+
+                    /* CDF TEST
+                    val samples = listOf(2.4152, 2.3925, 0.512, 1.277, 2.999, 0.8912, 0.0)
+                    val cdfPoints = lumaRoutes.getCDFPlotPoints(samples);
+                    Log.i("CDF TEST", "$cdfPoints");
+                     */
                 },
                 content = { Text("Interpolation Test A") }
             )
