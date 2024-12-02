@@ -2,8 +2,6 @@ package com.example.lumapraktikum1.ui.composables.location
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.location.LocationListener
-import android.location.LocationManager
 import android.preference.PreferenceManager
 import android.util.Log
 import androidx.compose.foundation.layout.Column
@@ -29,43 +27,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
-import com.example.lumapraktikum1.model.LocationReading
+import com.example.lumapraktikum1.core.LumaticLocationListener2
 import com.example.lumapraktikum1.core.LumaticRoute
 import com.example.lumapraktikum1.ui.composables.system.LifeCycleHookWrapper
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
 @SuppressLint("MissingPermission")
 @Composable
 fun LocationComposable(navController: NavHostController, ctx: Context) {
 
-    var locationManager by remember { mutableStateOf<LocationManager?>(null) }
-    var locationListener by remember { mutableStateOf<LocationListener?>(null) }
-    var firstFix by remember { mutableStateOf(true) }
-    var reachedWaypoint by remember { mutableStateOf(false) }
-
-
-    var singleCurrentLocation by remember {
-        mutableStateOf<LocationReading?>(null)
-    }
-
-    var allCurrentReadings by remember {
-        mutableStateOf<List<LocationReading>>(listOf())
-    }
-
-    var waypointReadings by remember {
-        mutableStateOf<List<LocationReading>>(listOf())
-    }
-
     var sampleRateMs by remember { mutableIntStateOf(0) }
     var meterSelection by remember { mutableIntStateOf(1) }
-    var isRecording by remember { mutableStateOf(false) }
-    var provider by remember { mutableStateOf(LocationManager.GPS_PROVIDER) }
-
 
     /*** MapView Init ***/
     val mapCenter = GeoPoint(51.4818, 7.2162)
@@ -76,20 +52,11 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     val walkPath by remember { mutableStateOf(Polyline())}
     walkPath.outlinePaint.color = Color.Red.toArgb()
 
+    // TEST LumaticLocationListener2:
+    var lumaLocListener by remember { mutableStateOf<LumaticLocationListener2?>(null) }
+
     fun startRecording() {
-        locationListener?.let { listener ->
-            locationManager?.let { manager ->
-                manager.requestLocationUpdates(
-                    provider,
-                    sampleRateMs.toLong(),
-                    meterSelection.toFloat(),
-                    listener
-                )
-                isRecording = true
-                firstFix = true
-                Log.i("LocReading", "START Location reading")
-            }
-        }
+        lumaLocListener?.startRecording()
 
         // (re-)init walkPath polyline & make sure it's on the current top
         walkPath.actualPoints.clear()
@@ -99,13 +66,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
     }
 
     fun stopRecording() {
-        locationListener?.let { listener ->
-            locationManager?.let { manager ->
-                manager.removeUpdates(listener)
-                isRecording = false
-                Log.i("LocReading", "STOP Location reading")
-            }
-        }
+        lumaLocListener?.stopRecording()
     }
 
     LifeCycleHookWrapper(
@@ -114,37 +75,17 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             if (event == Lifecycle.Event.ON_DESTROY) {
                 stopRecording()
             } else if (event == Lifecycle.Event.ON_CREATE) {
-                locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                locationListener = LocationListener { p0 ->
-                    if (isRecording) {
-                        singleCurrentLocation = LocationReading(
-                            timestampMillis = System.currentTimeMillis(),
-                            long = p0.longitude,
-                            lat = p0.latitude,
-                            altitude = 0.0 //values[2]
-                        )
-
-                        allCurrentReadings += singleCurrentLocation!!
-                        Log.i("Location", "Location Reading added")
-
-                        if(reachedWaypoint) {
-                            waypointReadings += singleCurrentLocation!!
-                            reachedWaypoint = false
-                            Log.i("Location", "Waypoint Reading added")
-                        }
-
-                        if (firstFix) {
-                            mapView.controller.setCenter(GeoPoint(p0.latitude, p0.longitude))
-                            mapView.controller.setZoom(19.0)
-                            firstFix = false
-                        }
-                    }
-                }
+                lumaLocListener = LumaticLocationListener2(
+                    LumaticLocationListener2.PROVIDER.GPS,
+                    sampleRateMs.toLong(),
+                    mapView,
+                    ctx
+                )
             }
         }
     )
 
-    DisposableEffect(key1 = sampleRateMs, key2 = meterSelection, key3 = provider) {
+    DisposableEffect(key1 = sampleRateMs, key2 = meterSelection) {
         /* Warum sollte der listener laufen wenn man den Knopf noch nicht gedrückt hat?
         locationListener?.let { locationManager?.removeUpdates(it) }
         locationListener?.let {
@@ -177,31 +118,16 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                         mapView
                     },
                     update = { view ->
-                        // Code to update or recompose the view goes here
-                        // Since geoPoint is read here, the view will recompose whenever it is updated
 
-                        /*
-                        mapView.controller.setCenter(mapCenter)
-                        mapView.controller.setZoom(12.0)
-                        allCurrentReadings.forEach { it ->
-                            val testMarker = Marker(view)
-                            testMarker.setPosition(GeoPoint(it.lat, it.long))
-                            view.overlays.add(testMarker)
-                            Log.i("MapViewInfo", "Overlay Count: ${view.overlays.count()}") // bro
-                        }
-                        */
-                        singleCurrentLocation?.let {
+                        lumaLocListener?.getLatestLocation()?.let {
                             val newPoint = GeoPoint(it.lat, it.long)
+                            walkPath.addPoint(newPoint)
 
-                            // add walk path Marker
-                            /* (too much clutter)
+                            /* // add walk path Marker (too much clutter imo)
                             val newMarker = Marker(view)
                             newMarker.setPosition(newPoint)
                             view.overlays.add(newMarker)
                             */
-
-                            // add walk path Polyline Point
-                            walkPath.addPoint(newPoint)
                         }
                         view.invalidate()
                         Log.i("MapViewInfo", "MapView updated")
@@ -212,10 +138,10 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
             Spacer(Modifier.height(20.dp))
 
             Button(onClick = {
-                if(isRecording) stopRecording()
+                if(lumaLocListener?.isRecording() == true) stopRecording()
                 else startRecording()
             }) {
-                if(isRecording) Text("Stop Recording")
+                if(lumaLocListener?.isRecording() == true) Text("Stop Recording")
                 else Text("Start Recording")
             }
 
@@ -232,7 +158,7 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
 
             // Button speichert den nächsten fix in der waypointReading list
             Button(
-                onClick = { reachedWaypoint = true; },
+                onClick = { lumaLocListener?.reachedWaypoint = true; },
                 content = { Text("Wegpunkt erreicht") }
             )
 
