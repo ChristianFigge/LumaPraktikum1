@@ -148,8 +148,8 @@ class LumaticRoute(
         : MutableList<GeoPoint>
     {
         val nSteps = abs(bTimeMillis - aTimeMillis) / stepMillis // implicit floor
-        val latStep = abs(b.latitude - a.latitude) / nSteps
-        val longStep = abs(b.longitude - a. longitude) / nSteps
+        val latStep = (b.latitude - a.latitude) / nSteps
+        val longStep = (b.longitude - a. longitude) / nSteps
 
         val pointList = mutableListOf<GeoPoint>(a)
         for (stepCount in 1..<nSteps) {
@@ -175,8 +175,8 @@ class LumaticRoute(
         val timeDiff = abs(b.timestampMillis - a.timestampMillis)
         val nSteps = timeDiff / stepMillis // implicit floor
 
-        val latStep = abs(b.lat - a.lat) / nSteps
-        val longStep = abs(b.long - a. long) / nSteps
+        val latStep = (b.lat - a.lat) / nSteps
+        val longStep = (b.long - a. long) / nSteps
         val timeStep = timeDiff / nSteps
 
         val pointList = mutableListOf<LocationReading>(a)

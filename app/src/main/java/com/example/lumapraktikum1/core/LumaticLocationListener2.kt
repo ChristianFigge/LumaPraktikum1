@@ -6,7 +6,6 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import com.example.lumapraktikum1.model.LocationReading
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
