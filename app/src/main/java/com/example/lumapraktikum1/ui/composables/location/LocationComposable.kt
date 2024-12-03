@@ -34,6 +34,7 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
 @SuppressLint("MissingPermission")
@@ -54,9 +55,11 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
 
     // TEST LumaticLocationListener2:
     var lumaLocListener by remember { mutableStateOf<LumaticLocationListener2?>(null) }
+    var firstFix by remember { mutableStateOf(true) }
 
     fun startRecording() {
         lumaLocListener?.startRecording()
+        firstFix = true
 
         // (re-)init walkPath polyline & make sure it's on the current top
         walkPath.actualPoints.clear()
@@ -78,7 +81,6 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                 lumaLocListener = LumaticLocationListener2(
                     LumaticLocationListener2.PROVIDER.GPS,
                     sampleRateMs.toLong(),
-                    mapView,
                     ctx
                 )
             }
@@ -122,7 +124,13 @@ fun LocationComposable(navController: NavHostController, ctx: Context) {
                         lumaLocListener?.getLatestLocation()?.let {
                             val newPoint = GeoPoint(it.lat, it.long)
                             walkPath.addPoint(newPoint)
+                            Log.i("MapViewInfo", "WalkPath updated")
 
+                            if(firstFix) {
+                                view.controller.setCenter(newPoint)
+                                view.controller.setZoom(19.0)
+                                firstFix = false
+                            }
                             /* // add walk path Marker (too much clutter imo)
                             val newMarker = Marker(view)
                             newMarker.setPosition(newPoint)
